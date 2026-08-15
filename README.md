@@ -80,6 +80,18 @@ Read `docs/decisions/` before changing anything structural.
    application fee, salon KYC at onboarding. That decision is what makes this a
    marketplace rather than a directory.
 
+## Stack
+
+**Spring Boot on the backend, TypeScript on the frontend** — see ADR 0004. Cal is
+reached over HTTP, and an HTTP boundary is a language boundary; the domain on our
+side is payments, ledger, POS and audited records, which is JVM territory. The
+frontends stay TypeScript because SEO requires server rendering and Cal's
+embeddable React components carry the business calendar.
+
+Start as a **Spring Modulith modular monolith** with `marketplace`, `search`,
+`payments` and `sync` as enforced modules — not four deployables. Split when a
+module earns its own scaling curve; `search` will be first.
+
 ## Next
 
 In the order worth doing it:
@@ -96,6 +108,13 @@ In the order worth doing it:
 - **Cal schedules people, not rooms.** A salon with four chairs and six
   stylists has a constraint Cal does not model. Decide before onboarding a
   salon that cares.
+- **A Redis slot hold is a courtesy, not a guarantee.** It stops two people at
+  checkout colliding; it does not stop a walk-in, a Google Calendar sync or a
+  Redis eviction. Cal refusing a booking is a normal handled path — see ADR 0005,
+  which also covers the payment ordering problem.
+- **Swedish specifics are not decoration.** Swish and Klarna rather than card
+  rails, kassaregister obligations for physical drop-in sales, and treatment
+  journals as special-category personal data kept out of booking metadata.
 - **Availability accuracy is a product metric.** `availability_miss` exists to
   record "shown as available, turned out not to be". It quietly decides whether
   consumers come back and is invisible unless measured.
