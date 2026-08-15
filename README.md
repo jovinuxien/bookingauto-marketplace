@@ -92,6 +92,14 @@ Start as a **Spring Modulith modular monolith** with `marketplace`, `search`,
 `payments` and `sync` as enforced modules — not four deployables. Split when a
 module earns its own scaling curve; `search` will be first.
 
+One backend serves **both** frontends. The monolith is not "the B2B side" — B2C
+and B2B are two TypeScript applications over the same Spring backend, and the
+module boundaries inside it are by domain, not by audience.
+
+Search launches on **PostGIS alone**; OCSS enters in phase two, for free-text
+relevance, once there are query logs to tune against. See ADR 0006 — OCSS has no
+geo support at all, and geo is this product's primary filter.
+
 ## Next
 
 In the order worth doing it:
