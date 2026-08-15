@@ -1,0 +1,86 @@
+##
+## Local stack for the booking marketplace.
+##
+##   docker compose up -d
+##
+## Ports are deliberately unusual: 5432, 5433 and 6379 are already taken on this
+## machine by other work, so nothing here can collide with it.
+##
+## Two databases on purpose. Cal owns scheduling; the marketplace owns
+## everything else. Sharing one database would make it far too easy to write
+## availability from both sides, which is the one thing that must never happen.
+##
+
+services:
+  # ---------------------------------------------------------------- cal.diy --
+  # The scheduling engine. Source of truth for whether a slot is free.
+  #
+  # Cal.com Inc. explicitly does not support Docker — the image and compose
+  # setup are community maintained. Fine for local development; for production
+  # decide deliberately between building from source and running the image.
+  cal-db:
+    image: postgres:16
+    container_name: bm-cal-db
+    environment:
+      POSTGRES_USER: cal
+      POSTGRES_PASSWORD: ${CAL_DB_PASSWORD:?set CAL_DB_PASSWORD in .env}
+      POSTGRES_DB: calendso
+    ports:
+      - "5442:5432"
+    volumes:
+      - cal-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cal -d calendso"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  cal:
+    image: calcom/cal.com:v6.2.0
+    container_name: bm-cal
+    depends_on:
+      cal-db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://cal:${CAL_DB_PASSWORD}@cal-db:5432/calendso
+      DATABASE_DIRECT_URL: postgresql://cal:${CAL_DB_PASSWORD}@cal-db:5432/calendso
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?set NEXTAUTH_SECRET in .env}
+      CALENDSO_ENCRYPTION_KEY: ${CALENDSO_ENCRYPTION_KEY:?set CALENDSO_ENCRYPTION_KEY in .env}
+      NEXTAUTH_URL: http://localhost:3000
+      NEXT_PUBLIC_WEBAPP_URL: http://localhost:3000
+      NEXT_PUBLIC_LICENSE_CONSENT: "agree"
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/auth/login > /dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 90s
+
+  # ----------------------------------------------------------- marketplace --
+  # Providers, consumers, reviews, money, and the availability index.
+  #
+  # PostGIS rather than plain Postgres: "near me" is the primary query of the
+  # entire product, and bolting geo on later means reindexing everything.
+  market-db:
+    image: postgis/postgis:16-3.4
+    container_name: bm-market-db
+    environment:
+      POSTGRES_USER: market
+      POSTGRES_PASSWORD: ${MARKET_DB_PASSWORD:?set MARKET_DB_PASSWORD in .env}
+      POSTGRES_DB: marketplace
+    ports:
+      - "5443:5432"
+    volumes:
+      - market-db:/var/lib/postgresql/data
+      - ./db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U market -d marketplace"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  cal-db:
+  market-db:
