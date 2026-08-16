@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import se.marketplace.booking.BookingRepository.Attempt;
 import se.marketplace.booking.BookingRepository.NewAttempt;
 import se.marketplace.booking.BookingRepository.ServiceForSale;
+import se.marketplace.notifications.Notifier;
 import se.marketplace.payments.PaymentPort;
 import se.marketplace.sync.AvailabilityRefreshPort;
 import se.marketplace.sync.CalBookingPort;
@@ -53,6 +54,7 @@ public class BookingFunnel {
 	private final CalBookingPort cal;
 	private final PaymentPort payments;
 	private final AvailabilityRefreshPort availability;
+	private final Notifier notifier;
 
 	/** Basis points. 1500 = 15%. Frozen onto the attempt at stage 5. */
 	@Value("${marketplace.commission-bps:1500}")
@@ -62,11 +64,12 @@ public class BookingFunnel {
 	private String timeZone;
 
 	BookingFunnel(BookingRepository repository, CalBookingPort cal,
-		PaymentPort payments, AvailabilityRefreshPort availability) {
+		PaymentPort payments, AvailabilityRefreshPort availability, Notifier notifier) {
 		this.repository = repository;
 		this.cal = cal;
 		this.payments = payments;
 		this.availability = availability;
+		this.notifier = notifier;
 	}
 
 	/**
@@ -233,6 +236,7 @@ public class BookingFunnel {
 		// waiting for Cal's webhook, which is a latency optimisation and not a
 		// guarantee.
 		availability.markStale(attempt.serviceId());
+		notifier.bookingConfirmed(notice(attempt, "confirmed", reservation.start()));
 
 		return new Outcome(attempt.id(), AttemptState.CONFIRMED, reservation.uid(), null);
 	}
@@ -283,6 +287,7 @@ public class BookingFunnel {
 			"booking=" + bookingId, false);
 
 		availability.markStale(attempt.serviceId());
+		notifier.bookingConfirmed(notice(attempt, "confirmed", attempt.slotStart()));
 
 		return new Outcome(attempt.id(), AttemptState.CONFIRMED, attempt.calBookingUid(), null);
 	}
@@ -309,6 +314,7 @@ public class BookingFunnel {
 
 		AttemptState end = released ? AttemptState.CHARGE_FAILED : AttemptState.NEEDS_ATTENTION;
 		repository.transition(attempt, end, "stripe", released ? "refused" : "error", reason, false);
+		tell(attempt, end, reason);
 
 		return new Outcome(attempt.id(), end, attempt.calBookingUid(), reason);
 	}
@@ -357,6 +363,7 @@ public class BookingFunnel {
 
 		AttemptState end = released ? onSuccess : AttemptState.NEEDS_ATTENTION;
 		repository.transition(attempt, end, "cal", released ? "refused" : "error", why, false);
+		tell(attempt, end, why);
 
 		return new Outcome(attempt.id(), end, uid, why);
 	}
@@ -400,7 +407,49 @@ public class BookingFunnel {
 
 		AttemptState end = released ? AttemptState.CONFIRM_FAILED : AttemptState.NEEDS_ATTENTION;
 		repository.transition(attempt, end, "cal", "error", why, false);
+		// Refunded either way; the customer is told that, not what broke.
+		notifier.bookingRefunded(notice(attempt, "refunded", attempt.slotStart()), why);
 		return new Outcome(attempt.id(), end, uid, why);
+	}
+
+	/**
+	 * Tells the customer what happened, in their terms rather than the state
+	 * machine's.
+	 *
+	 * <p>Every terminal state that a person is waiting on gets a message. The
+	 * ones that do not — an abandoned attempt nobody submitted, a refusal
+	 * answered synchronously on screen — are left alone deliberately: an email
+	 * about something the customer already saw resolve is noise, and noise is
+	 * how the messages that matter get ignored.
+	 */
+	private void tell(Attempt attempt, AttemptState end, String reason) {
+		switch (end) {
+			case CHARGE_FAILED, VERIFY_FAILED ->
+				notifier.bookingReleased(notice(attempt, "released", attempt.slotStart()), reason);
+			case NEEDS_ATTENTION ->
+				notifier.bookingNeedsAttention(notice(attempt, "attention", attempt.slotStart()));
+			default -> {
+				// Nothing owed.
+			}
+		}
+	}
+
+	/**
+	 * The dedupe key is the attempt plus the outcome, so a redelivered webhook
+	 * or a re-run sweeper cannot produce a second email about the same event.
+	 */
+	private Notifier.BookingNotice notice(Attempt attempt, String event, java.time.Instant startsAt) {
+		return new Notifier.BookingNotice(
+			"attempt:" + attempt.id() + ":" + event,
+			attempt.customerEmail(),
+			attempt.customerName(),
+			repository.providerName(attempt.providerId()),
+			repository.serviceName(attempt.serviceId()),
+			startsAt,
+			attempt.priceMinor(),
+			attempt.currency(),
+			attempt.bookingId(),
+			attempt.providerId());
 	}
 
 	private Outcome outcomeOf(Attempt attempt) {

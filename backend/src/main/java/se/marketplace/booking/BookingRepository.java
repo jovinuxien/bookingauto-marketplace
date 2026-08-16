@@ -243,6 +243,17 @@ class BookingRepository {
 				.addValue("age", indexAgeSeconds));
 	}
 
+	/** Names for the customer's confirmation. Cheap, and only read when one is owed. */
+	String providerName(long providerId) {
+		return jdbc.queryForObject("SELECT name FROM provider WHERE id = :id",
+			new MapSqlParameterSource("id", providerId), String.class);
+	}
+
+	String serviceName(long serviceId) {
+		return jdbc.queryForObject("SELECT name FROM service WHERE id = :id",
+			new MapSqlParameterSource("id", serviceId), String.class);
+	}
+
 	/** The quote inputs, read once at stage 5 and then frozen onto the attempt. */
 	Optional<ServiceForSale> findServiceForSale(long serviceId) {
 		return jdbc.query("""

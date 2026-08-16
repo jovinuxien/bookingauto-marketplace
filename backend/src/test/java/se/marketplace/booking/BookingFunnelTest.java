@@ -16,6 +16,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import se.marketplace.booking.BookingRepository.Attempt;
 import se.marketplace.booking.BookingRepository.NewAttempt;
 import se.marketplace.booking.BookingRepository.ServiceForSale;
+import se.marketplace.notifications.Notifier;
 import se.marketplace.payments.PaymentPort;
 import se.marketplace.sync.CalBookingPort;
 
@@ -39,6 +40,7 @@ class BookingFunnelTest {
 	private FakePayments payments;
 	private RecordingRepository repository;
 	private List<Long> refreshed;
+	private RecordingNotifier notifier;
 	private BookingFunnel funnel;
 
 	@BeforeEach
@@ -47,8 +49,10 @@ class BookingFunnelTest {
 		payments = new FakePayments();
 		repository = new RecordingRepository();
 		refreshed = new ArrayList<>();
+		notifier = new RecordingNotifier();
 
-		funnel = new BookingFunnel(repository, cal, payments, serviceId -> refreshed.add(serviceId));
+		funnel = new BookingFunnel(repository, cal, payments,
+			serviceId -> refreshed.add(serviceId), notifier);
 		ReflectionTestUtils.setField(funnel, "commissionBps", 1500);
 		ReflectionTestUtils.setField(funnel, "timeZone", "Europe/Stockholm");
 	}
@@ -326,6 +330,52 @@ class BookingFunnelTest {
 		assertThat(funnel.paymentSucceeded("pi_not_ours", "ch")).isNull();
 	}
 
+	// -------------------------------------------------------- what we tell --
+
+	@Test
+	@DisplayName("a completed sale tells the customer")
+	void confirmedSaleNotifies() {
+		book();
+		assertThat(notifier.sent).containsExactly("confirmed");
+	}
+
+	@Test
+	@DisplayName("a released slot is told about, even though nothing was charged")
+	void releasedSlotNotifies() {
+		payments.refuse = true;
+
+		book();
+
+		// Silence here is how someone turns up to a salon that is not expecting
+		// them: they clicked book and heard nothing.
+		assertThat(notifier.sent).containsExactly("released");
+	}
+
+	@Test
+	@DisplayName("an unresolved attempt is told about, and not asked to retry")
+	void needsAttentionNotifies() {
+		payments.refuse = true;
+        cal.cancelFails = true;
+
+		book();
+
+		assertThat(notifier.sent).containsExactly("attention");
+	}
+
+	@Test
+	@DisplayName("nothing is sent twice for one event")
+	void oneEventOneMessage() {
+		payments.requiresAction = true;
+		book();
+		funnel.paymentSucceeded("pi_1", "ch_1");
+		funnel.paymentSucceeded("pi_1", "ch_1");
+
+		// The dedupe key is enforced in the database, but a caller that sends
+		// twice still costs an insert and a race; the funnel should not try.
+		assertThat(notifier.sent).containsExactly("confirmed");
+		assertThat(notifier.keys).containsExactly("attempt:1:confirmed");
+	}
+
 	// ----------------------------------------------------------- idempotency --
 
 	@Test
@@ -455,6 +505,48 @@ class BookingFunnelTest {
 		@Override
 		Integer indexAgeSeconds(long serviceId, Instant slotStart) {
 			return 42;
+		}
+
+		@Override
+		String providerName(long providerId) {
+			return "Salong Test";
+		}
+
+		@Override
+		String serviceName(long serviceId) {
+			return "Klippning";
+		}
+	}
+
+	/** Records what the customer would be told, and under which key. */
+	private static final class RecordingNotifier implements Notifier {
+
+		final List<String> sent = new ArrayList<>();
+		final List<String> keys = new ArrayList<>();
+
+		private void record(String kind, BookingNotice notice) {
+			sent.add(kind);
+			keys.add(notice.dedupeKey());
+		}
+
+		@Override
+		public void bookingConfirmed(BookingNotice notice) {
+			record("confirmed", notice);
+		}
+
+		@Override
+		public void bookingReleased(BookingNotice notice, String reason) {
+			record("released", notice);
+		}
+
+		@Override
+		public void bookingRefunded(BookingNotice notice, String reason) {
+			record("refunded", notice);
+		}
+
+		@Override
+		public void bookingNeedsAttention(BookingNotice notice) {
+			record("attention", notice);
 		}
 	}
 

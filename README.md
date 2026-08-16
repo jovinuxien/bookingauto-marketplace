@@ -106,6 +106,11 @@ API without anything hand-written in between:
   JSON-LD block parses — both were broken when first written, and neither
   failure was visible from the page
 
+- **Customers now hear from us.** A transactional outbox: the message is
+  written in the same transaction as the event that owes it, and a dispatcher
+  delivers it. Verified over real SMTP into MailHog, with the Swedish subject
+  correctly UTF-8 encoded
+
 Sketch:
 
 - Stripe is exercised only against `stripe-mock`, which validates request shape
@@ -204,8 +209,8 @@ In the order worth doing it:
    Swish redirection, webhook signatures, Connect onboarding, payouts.
 2. Self-serve salon signup. Onboarding is an operator action today, because
    opening it needs email verification and rate limiting first.
-3. Notifications. A salon currently learns about a booking from Cal's own email,
-   and the console; nothing tells the customer anything we wrote.
+3. HTML email. The messages are plain text, which is honest and legible but
+   not what a consumer brand ships.
 
 Done: the availability reconciler, the booking funnel with its compensations,
 Stripe Connect with the asynchronous payment path, and provider onboarding.
@@ -256,3 +261,19 @@ therefore real and stays on — disabled only where a cookie plays no part.
 Bootstrap the first operator with
 `MARKETPLACE_CONSOLE_BOOTSTRAP_ADMIN_EMAIL` / `..._PASSWORD`. It runs once,
 does nothing if an admin exists, and logs a warning telling you to remove it.
+
+## Notifications
+
+Cal sends nothing: its image has no `sendmail` binary, so its own confirmations
+fail silently — which is why, until now, a customer who booked heard nothing at
+all. If Cal is ever given working SMTP, both will send and the duplicate has to
+be resolved deliberately rather than discovered.
+
+```bash
+docker compose up -d mailhog          # :8026 for the web UI
+MARKETPLACE_NOTIFICATIONS_TRANSPORT=smtp mvn spring-boot:run
+```
+
+Sending is opt-in (`transport=log` by default). A machine that starts emailing
+real customers because a config file was copied is worse than one that stays
+quiet.

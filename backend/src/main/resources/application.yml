@@ -1,6 +1,9 @@
 spring:
   application:
     name: booking-marketplace
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1026}
   datasource:
     # The marketplace database. Cal has its own, deliberately separate: sharing
     # one would make it far too easy to write availability from both sides.
@@ -42,6 +45,15 @@ marketplace:
       base-url: ${MARKETPLACE_PAYMENTS_STRIPE_BASE_URL:}
       webhook-secret: ${MARKETPLACE_PAYMENTS_STRIPE_WEBHOOK_SECRET:}
       methods: swish,card
+
+  notifications:
+    # 'log' writes to the log and delivers nothing. Sending is opt-in, because
+    # a machine that starts emailing real customers by accident is worse than
+    # one that stays quiet.
+    transport: ${MARKETPLACE_NOTIFICATIONS_TRANSPORT:log}
+    from: ${MARKETPLACE_NOTIFICATIONS_FROM:no-reply@example.se}
+    interval-ms: ${MARKETPLACE_NOTIFICATIONS_INTERVAL_MS:15000}
+    max-attempts: 8
 
   checkout:
     # Nobody sends a webhook for a customer who simply walked away, so this is

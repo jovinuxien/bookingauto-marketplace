@@ -145,6 +145,21 @@ services:
     ports:
       - "12111:12111"
 
+  # ---------------------------------------------------------------- mailhog --
+  # Catches outgoing mail instead of delivering it, with a web UI on :8026.
+  # Host ports are shifted by one: 1025 and 8025 are already taken on this
+  # machine, which is the same reason every other port here is unusual.
+  #
+  # Same reason stripe-mock is here: an SMTP path that has never actually spoken
+  # to a mail server is a guess. This proves the wire format and the headers;
+  # it says nothing about deliverability, which only a real provider can.
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: bm-mailhog
+    ports:
+      - "1026:1025"
+      - "8026:8025"
+
 volumes:
   cal-db:
   market-db:

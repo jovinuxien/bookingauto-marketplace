@@ -41,6 +41,12 @@
       <artifactId>spring-boot-starter-jdbc</artifactId>
     </dependency>
 
+    <!-- Sending what the outbox owes. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-mail</artifactId>
+    </dependency>
+
     <!-- Server-rendered landing pages. The booking journey is a SPA; the pages
          a search engine has to read are HTML, because a crawler given an empty
          <div id="root"> has nothing to rank. -->
