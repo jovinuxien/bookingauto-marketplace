@@ -46,20 +46,41 @@ If the booking call fails after the payment succeeded, the customer has been
 charged for an appointment that does not exist. There is no compensation step in
 that sequence, and this is the single most likely way to lose a customer's trust.
 
-Two acceptable orderings:
+Only one ordering survives contact with the Swedish payment methods. Checked
+against Stripe's Swish documentation:
+
+| | Swish on Stripe |
+|---|---|
+| Connect | yes — direct, destination, separate charges and transfers |
+| Refunds | yes, full and partial, up to 365 days |
+| **Manual capture** | **no** |
+| Disputes | none |
+| Recurring | no |
+
+No manual capture means **authorise-then-capture is not available**. The second
+ordering below is therefore closed to us for the dominant Swedish payment
+method, and we do not want two different orderings depending on how the customer
+chose to pay.
 
 **Reserve first (preferred).** Create the booking in Cal in a pending state,
 then charge, then confirm. If payment fails or is abandoned, cancel the pending
 booking. The slot is genuinely held by the authority that owns it, and no money
 moves against a slot that was not secured.
 
-**Charge first with compensation.** Authorise rather than capture, create the
-booking, capture on success, void the authorisation on failure. Requires the
-payment provider to support authorise-and-capture — check this against Swish
-specifically, whose flow differs from card rails.
+**Charge first with compensation.** ~~Authorise rather than capture, create the
+booking, capture on success, void the authorisation on failure.~~ **Not
+available** — Swish does not support manual capture. Recorded here so nobody
+re-proposes it.
 
-Either way the compensating action is explicit, logged, and tested. "It should
-not happen" is not a design.
+So: reserve first, and the compensating action is a **refund**, not a void.
+Swish refunds are full or partial and complete in minutes, which makes the
+abandoned-checkout path acceptable. It must still be explicit, logged and
+tested; "it should not happen" is not a design.
+
+Two consequences worth carrying forward. Swish has **no disputes**, which
+removes a whole class of marketplace chargeback risk. And it has **no recurring
+payments**, so anything subscription-shaped — a wellness card billed monthly to
+an employer — needs card rails, not Swish.
 
 ## Consequences
 

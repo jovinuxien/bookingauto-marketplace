@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: booking-marketplace
+  datasource:
+    # The marketplace database. Cal has its own, deliberately separate: sharing
+    # one would make it far too easy to write availability from both sides.
+    url: jdbc:postgresql://localhost:5443/marketplace
+    username: market
+    password: ${MARKET_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+
+server:
+  port: 8090
+
+logging:
+  level:
+    se.marketplace: DEBUG

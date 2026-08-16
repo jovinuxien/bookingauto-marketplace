@@ -11,7 +11,17 @@ settlement reporting.
 
 ## Decision
 
-Payments run through Stripe Connect. The consumer is charged by the platform;
+Payments run through **Stripe Connect**, with **Swish and Klarna as payment
+methods inside it** rather than as separate integrations. This reconciles the
+localisation requirement with a single ledger: Stripe supports Swish in SEK with
+full Connect support, so the Swedish customer pays the way they expect while we
+keep one settlement pipeline instead of three.
+
+Note that Stripe is **merchant of record for Swish** — Stripe's name appears in
+the customer's Swish app and bank statement, with our business name in the
+message field. Confirm that is acceptable to the brand before launch.
+
+ The consumer is charged by the platform;
 the commission is taken as an application fee; the balance is destined for the
 salon's connected account. Salon KYC happens at onboarding, before the salon
 can be listed.

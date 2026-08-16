@@ -1,0 +1,8 @@
+se/marketplace/search/SearchController.class
+se/marketplace/search/PostgisSearch.class
+se/marketplace/search/package-info.class
+se/marketplace/search/SearchPort.class
+se/marketplace/search/SearchPort$SearchHit.class
+se/marketplace/search/SearchPort$SearchRequest.class
+se/marketplace/search/SearchPort$PartOfDay.class
+se/marketplace/BackendApplication.class
