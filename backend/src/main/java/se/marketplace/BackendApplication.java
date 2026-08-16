@@ -20,6 +20,7 @@ import org.springframework.modulith.Modulithic;
 	systemName = "booking-marketplace",
 	sharedModules = {}
 )
+@org.springframework.scheduling.annotation.EnableScheduling
 @SpringBootApplication
 public class BackendApplication {
 
