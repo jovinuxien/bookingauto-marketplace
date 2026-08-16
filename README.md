@@ -100,6 +100,12 @@ API without anything hand-written in between:
   from the caller
 - 34 tests
 
+- **The pages a search engine has to read are HTML.** `/orter`,
+  `/frisor/{city}` and `/salong/{slug}` are server-rendered with canonicals and
+  JSON-LD, plus a generated sitemap. Every sitemap URL resolves 200 and every
+  JSON-LD block parses — both were broken when first written, and neither
+  failure was visible from the page
+
 Sketch:
 
 - Stripe is exercised only against `stripe-mock`, which validates request shape
@@ -194,13 +200,12 @@ geo support at all, and geo is this product's primary filter.
 
 In the order worth doing it:
 
-1. Prerendering the landing pages. The SPA is client-rendered, so city and
-   service pages — how a marketplace is actually found — do not rank. See the
-   amendment to ADR 0004; the fix is narrow and does not touch the journey.
-2. A Stripe test account, to verify the half that `stripe-mock` cannot: real
+1. A Stripe test account, to verify the half that `stripe-mock` cannot: real
    Swish redirection, webhook signatures, Connect onboarding, payouts.
-3. Self-serve salon signup. Onboarding is an operator action today, because
+2. Self-serve salon signup. Onboarding is an operator action today, because
    opening it needs email verification and rate limiting first.
+3. Notifications. A salon currently learns about a booking from Cal's own email,
+   and the console; nothing tells the customer anything we wrote.
 
 Done: the availability reconciler, the booking funnel with its compensations,
 Stripe Connect with the asynchronous payment path, and provider onboarding.

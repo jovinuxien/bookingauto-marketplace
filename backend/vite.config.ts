@@ -26,6 +26,10 @@ export default defineConfig({
     outDir: path.resolve(__dirname, 'target/classes/static'),
     emptyOutDir: true,
     sourcemap: true,
+    // Emitted so the server-rendered landing pages can reference the hashed
+    // bundles. Without it the templates would have to hardcode filenames that
+    // change on every build.
+    manifest: true,
   },
   server: {
     port: 3002,

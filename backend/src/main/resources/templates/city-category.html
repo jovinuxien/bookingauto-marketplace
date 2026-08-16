@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="sv" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: page(~{::content}, ~{::jsonld})}">
+  <head>
+    <!--
+      An ItemList of the salons on this page. It tells a search engine that this
+      is a list of places rather than an article that happens to mention them,
+      which is what earns the richer result this kind of query gets.
+    -->
+    <th:block th:fragment="jsonld">
+      <!--
+        th:inline="javascript", not "text". Text inlining writes the value raw,
+        so every string lands unquoted and the whole document is invalid JSON --
+        which a crawler discards silently, leaving a page that looks fine and
+        has no structured data at all.
+      -->
+      <script type="application/ld+json" th:inline="javascript">
+        /*[+
+        {
+          "@context": "https://schema.org",
+          "@type": "ItemList",
+          "name": [[${title}]],
+          "itemListElement": [
+            [# th:each="provider, iter : ${providers}"]
+            {
+              "@type": "ListItem",
+              "position": [[${iter.index + 1}]],
+              "item": {
+                "@type": "HealthAndBeautyBusiness",
+                "name": [[${provider.name}]],
+                "url": [[${'/salong/' + provider.slug}]],
+                "address": {
+                  "@type": "PostalAddress",
+                  "addressLocality": [[${provider.city}]]
+                }
+              }
+            }[# th:if="${!iter.last}"],[/]
+            [/]
+          ]
+        }
+        +]*/
+      </script>
+    </th:block>
+  </head>
+  <body>
+    <div th:fragment="content">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb small">
+          <li class="breadcrumb-item"><a href="/orter">Orter</a></li>
+          <li class="breadcrumb-item active" th:text="${cityName}">Stockholm</li>
+        </ol>
+      </nav>
+
+      <h1 class="h3" th:text="${category.label} + ' i ' + ${cityName}">Frisörer i Stockholm</h1>
+      <p class="text-muted" th:text="${description}">Jämför och boka.</p>
+
+      <div class="row g-3 mt-2">
+        <div class="col-12" th:each="provider : ${providers}">
+          <div class="card">
+            <div class="card-body d-flex justify-content-between flex-wrap gap-3">
+              <div>
+                <h2 class="h6 mb-1">
+                  <a th:href="'/salong/' + ${provider.slug}" th:text="${provider.name}">Salong</a>
+                </h2>
+                <div class="small text-muted">
+                  <span th:if="${provider.addressLine}" th:text="${provider.addressLine} + ', '"></span>
+                  <span th:text="${provider.city}">Stockholm</span>
+                </div>
+                <p class="mb-0 mt-2 small" th:if="${provider.description}"
+                   th:text="${provider.description}"></p>
+              </div>
+              <div class="text-end">
+                <div class="small text-muted" th:text="${provider.serviceCount} + ' tjänster'"></div>
+                <div class="fw-semibold"
+                     th:text="'Från ' + ${#numbers.formatInteger(provider.fromPriceMinor / 100, 0)} + ' ' + ${provider.currency}">
+                </div>
+                <a class="btn btn-sm btn-primary mt-2" th:href="'/salong/' + ${provider.slug}">
+                  Visa tider
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

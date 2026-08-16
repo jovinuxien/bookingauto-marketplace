@@ -68,6 +68,16 @@ class SecurityConfig {
 				.requestMatchers("/", "/index.html", "/assets/**", "/favicon.ico").permitAll()
 				.requestMatchers("/sok", "/salong/**", "/boka/**", "/logga-in", "/konsol/**").permitAll()
 
+				// --- the crawlable pages ---------------------------------------
+				// Server-rendered, and useless if a crawler is asked to sign in.
+				.requestMatchers("/orter", "/frisor/**", "/massage/**", "/hudvard/**").permitAll()
+				.requestMatchers("/sitemap.xml", "/robots.txt").permitAll()
+
+				// Spring forwards every unhandled status here, so leaving it
+				// closed turns a 404 into a 401 and makes a missing page look
+				// like a permissions bug.
+				.requestMatchers("/error").permitAll()
+
 				// --- webhooks: verified by signature, not by session ----------
 				.requestMatchers("/internal/**").permitAll()
 

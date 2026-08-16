@@ -30,7 +30,9 @@ class WebConfig implements WebMvcConfigurer {
 	@Override
 	public void addViewControllers(ViewControllerRegistry registry) {
 		registry.addViewController("/sok").setViewName("forward:/index.html");
-		registry.addViewController("/salong/{slug}").setViewName("forward:/index.html");
+		// /salong/{slug} is not here: it is server-rendered by LandingController,
+		// because a salon's own name is one of the three things people search
+		// for before they know this site exists.
 		registry.addViewController("/boka/{serviceId}").setViewName("forward:/index.html");
 		registry.addViewController("/logga-in").setViewName("forward:/index.html");
 		registry.addViewController("/konsol").setViewName("forward:/index.html");

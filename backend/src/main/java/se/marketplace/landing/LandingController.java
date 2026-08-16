@@ -1,0 +1,156 @@
+package se.marketplace.landing;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
+
+/**
+ * The crawlable entry points.
+ *
+ * <p>Three pages, chosen because they are the three things someone searches for
+ * before they know this site exists: a city, a treatment in a city, and a salon
+ * by name.
+ *
+ * <p>Each is a complete HTML document with its own title, description, canonical
+ * URL and structured data, and each boots the SPA afterwards so the journey
+ * continues without a reload. The server-rendered markup is what gets indexed;
+ * React replaces it once it mounts.
+ */
+@Controller
+class LandingController {
+
+	private final LandingRepository repository;
+	private final ViteManifest manifest;
+
+	@Value("${marketplace.public-url:http://localhost:8090}")
+	private String publicUrl;
+
+	LandingController(LandingRepository repository, ViteManifest manifest) {
+		this.repository = repository;
+		this.manifest = manifest;
+	}
+
+	/** Cities we cover. The root of the crawlable tree. */
+	@GetMapping("/orter")
+	String cities(Model model) {
+		model.addAllAttributes(manifest.assets());
+		model.addAttribute("cities", repository.cities());
+		model.addAttribute("canonical", publicUrl + "/orter");
+		model.addAttribute("title", "Boka tid — orter");
+		model.addAttribute("description",
+			"Hitta salonger och kliniker med lediga tider, ort för ort.");
+		return "cities";
+	}
+
+	/**
+	 * The page that matters most: a treatment in a city.
+	 *
+	 * <p>{@code /frisor/stockholm} is the shape of the query people actually
+	 * type, and having a URL that matches it is most of what makes a marketplace
+	 * findable.
+	 */
+	// The category is constrained in the pattern itself. An unbounded
+	// /{a}/{b} would sit in front of every other two-segment path in the
+	// application and quietly shadow one the day it is added.
+	@GetMapping("/{category:frisor|massage|hudvard}/{city}")
+	String cityCategory(@PathVariable String category, @PathVariable String city, Model model) {
+		// Only known categories are pages. Without this every stray two-segment
+		// path becomes a thin, empty page, and a site full of those ranks worse
+		// than one without them.
+		Category resolved = Category.of(category)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+
+		List<LandingRepository.ProviderRow> providers =
+			repository.providersIn(city, resolved.slug());
+
+		if (providers.isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+		}
+
+		String cityName = providers.get(0).city();
+
+		model.addAllAttributes(manifest.assets());
+		model.addAttribute("providers", providers);
+		model.addAttribute("cityName", cityName);
+		model.addAttribute("category", resolved);
+		// path(), not slug(). The slug is the category's value in the database
+		// ("har"); the path is its URL ("frisor"). Using the wrong one pointed
+		// every canonical at a URL that 404s, which tells a search engine the
+		// real page is the one that does not exist.
+		model.addAttribute("canonical",
+			publicUrl + "/" + resolved.path() + "/" + city.toLowerCase());
+		model.addAttribute("title", resolved.label() + " i " + cityName + " — boka tid online");
+		model.addAttribute("description",
+			"Jämför " + resolved.label().toLowerCase() + " i " + cityName
+				+ " och boka en ledig tid direkt. " + providers.size() + " salonger.");
+		return "city-category";
+	}
+
+	/** A salon by name. */
+	@GetMapping("/salong/{slug}")
+	String provider(@PathVariable String slug, Model model) {
+		LandingRepository.ProviderRow provider = repository.provider(slug)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+
+		model.addAllAttributes(manifest.assets());
+		model.addAttribute("provider", provider);
+		model.addAttribute("services", repository.servicesOf(provider.id()));
+		model.addAttribute("canonical", publicUrl + "/salong/" + provider.slug());
+		model.addAttribute("title", provider.name() + " — boka tid i " + provider.city());
+		model.addAttribute("description",
+			provider.description() != null && !provider.description().isBlank()
+				? provider.description()
+				: "Boka tid hos " + provider.name() + " i " + provider.city()
+					+ ". Lediga tider direkt från salongens kalender.");
+		return "provider";
+	}
+
+	/**
+	 * The categories that have pages.
+	 *
+	 * <p>An enum rather than a table because a category is a URL and a piece of
+	 * copy before it is data. Adding one is a deliberate act — a new indexable
+	 * page — not a row someone inserts by accident.
+	 */
+	enum Category {
+		HAR("frisor", "har", "Frisörer"),
+		MASSAGE("massage", "massage", "Massage"),
+		HUD("hudvard", "hud", "Hudvård");
+
+		private final String path;
+		private final String slug;
+		private final String label;
+
+		Category(String path, String slug, String label) {
+			this.path = path;
+			this.slug = slug;
+			this.label = label;
+		}
+
+		static java.util.Optional<Category> of(String path) {
+			return java.util.Arrays.stream(values())
+				.filter(candidate -> candidate.path.equalsIgnoreCase(path))
+				.findFirst();
+		}
+
+		public String path() {
+			return path;
+		}
+
+		public String slug() {
+			return slug;
+		}
+
+		public String label() {
+			return label;
+		}
+	}
+
+}

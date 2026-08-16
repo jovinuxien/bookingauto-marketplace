@@ -50,11 +50,22 @@ it.
 > and service landing pages are how a marketplace is found, and they will not
 > rank as they stand.
 >
-> Recorded rather than resolved. The mitigation, when it matters, is narrow:
-> prerender only the landing pages, either as static HTML generated at build
-> time or behind a small rendering service, and leave the booking journey a SPA.
-> That keeps this layout and buys back the pages that actually need indexing —
-> a much smaller change than moving the whole frontend to server rendering.
+> **Resolved.** The landing pages are now rendered as HTML by Spring —
+> `/orter`, `/frisor/{city}` and `/salong/{slug}` — with their own titles,
+> descriptions, canonicals and JSON-LD, plus a generated `sitemap.xml` and
+> `robots.txt`. Everything behind them stays a SPA, which mounts over the
+> rendered markup once it loads.
+>
+> No Node rendering service and no build-time snapshot: the content comes from
+> the catalogue at request time, so a salon onboarded this morning has a page
+> this morning. Templates read Vite's manifest for the hashed bundle names, so
+> the two halves cannot drift.
+>
+> Deliberately excluded: **availability**. A page indexed today is read next
+> week, so publishing this week's free slots would be a promise that expires
+> before anyone sees it — and content that churns hourly reads as instability
+> rather than freshness. The pages carry what stays true: who exists, where they
+> are, what they sell and for how much.
 
 ## Why TypeScript for the frontend, without exception
 

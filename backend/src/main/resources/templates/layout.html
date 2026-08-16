@@ -1,0 +1,46 @@
+<!doctype html>
+<!--
+  The shell every crawlable page uses.
+
+  Content first, script last: the page is complete and readable before any
+  JavaScript runs, which is the entire point of rendering these on the server.
+  The SPA bundle then mounts and takes over navigation.
+-->
+<html lang="sv" xmlns:th="http://www.thymeleaf.org" th:fragment="page(content, jsonld)">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title th:text="${title}">Boka tid</title>
+    <meta name="description" th:content="${description}" />
+    <!-- One canonical URL per piece of content, so a page reached by several
+         paths does not compete with itself in the results. -->
+    <link rel="canonical" th:href="${canonical}" />
+    <meta property="og:title" th:content="${title}" />
+    <meta property="og:description" th:content="${description}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" th:content="${canonical}" />
+    <link th:each="sheet : ${stylesheets}" rel="stylesheet" th:href="${sheet}" />
+    <th:block th:replace="${jsonld}" />
+  </head>
+  <body>
+    <nav class="navbar navbar-expand navbar-dark bg-dark">
+      <div class="container">
+        <a class="navbar-brand fw-semibold" href="/">Boka</a>
+        <a class="navbar-text small text-white" href="/logga-in">För salonger</a>
+      </div>
+    </nav>
+
+    <main class="container py-4" id="root">
+      <th:block th:replace="${content}" />
+    </main>
+
+    <footer class="border-top mt-5 py-4">
+      <div class="container small text-muted">
+        Tider kommer från salongernas egna kalendrar. Bokningen bekräftas alltid mot kalendern
+        innan betalning.
+      </div>
+    </footer>
+
+    <script th:if="${hasBundle}" type="module" th:src="${script}"></script>
+  </body>
+</html>

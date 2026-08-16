@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="sv" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: page(~{::content}, ~{::jsonld})}">
+  <head>
+    <!--
+      A business with an offer catalogue. The prices are here because they are
+      stable facts about the salon; free times deliberately are not -- a page
+      indexed today is read next week, and publishing this week's availability
+      is a promise that expires before anyone sees it.
+    -->
+    <th:block th:fragment="jsonld">
+      <!--
+        A business with an offer catalogue. Prices are here because they are
+        stable facts about the salon; free times deliberately are not -- a page
+        indexed today is read next week, and publishing this week's availability
+        is a promise that expires before anyone sees it.
+      -->
+      <script type="application/ld+json" th:inline="javascript">
+        /*[+
+        {
+          "@context": "https://schema.org",
+          "@type": "HealthAndBeautyBusiness",
+          "name": [[${provider.name}]],
+          "url": [[${canonical}]],
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": [[${provider.addressLine}]],
+            "addressLocality": [[${provider.city}]],
+            "addressCountry": "SE"
+          },
+          "hasOfferCatalog": {
+            "@type": "OfferCatalog",
+            "name": "Tjänster",
+            "itemListElement": [
+              [# th:each="service, iter : ${services}"]
+              {
+                "@type": "Offer",
+                "name": [[${service.name}]],
+                "price": [[${service.priceMinor / 100}]],
+                "priceCurrency": [[${service.currency}]]
+              }[# th:if="${!iter.last}"],[/]
+              [/]
+            ]
+          }
+        }
+        +]*/
+      </script>
+    </th:block>
+  </head>
+  <body>
+    <div th:fragment="content">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb small">
+          <li class="breadcrumb-item"><a href="/orter">Orter</a></li>
+          <li class="breadcrumb-item">
+            <a th:href="'/frisor/' + ${provider.citySlug}"
+               th:text="${provider.city}">Stockholm</a>
+          </li>
+          <li class="breadcrumb-item active" th:text="${provider.name}">Salong</li>
+        </ol>
+      </nav>
+
+      <h1 class="h3" th:text="${provider.name}">Salong</h1>
+      <p class="text-muted">
+        <span th:if="${provider.addressLine}" th:text="${provider.addressLine} + ', '"></span>
+        <span th:text="${provider.city}">Stockholm</span>
+      </p>
+      <p th:if="${provider.description}" th:text="${provider.description}"></p>
+
+      <h2 class="h6 mt-4">Tjänster</h2>
+      <ul class="list-group mb-4">
+        <li class="list-group-item d-flex justify-content-between" th:each="service : ${services}">
+          <span th:text="${service.name} + ' · ' + ${service.durationMinutes} + ' min'">Tjänst</span>
+          <span th:text="${#numbers.formatInteger(service.priceMinor / 100, 0)} + ' ' + ${service.currency}">
+          </span>
+        </li>
+      </ul>
+
+      <!--
+        Rendered so the page is usable and indexable without JavaScript. Once the
+        SPA mounts it replaces this with the live slot picker, which needs to ask
+        Cal and therefore cannot be part of a cached document.
+      -->
+      <p class="text-muted small" th:if="${!hasBundle}">
+        Lediga tider visas när sidans skript har laddats.
+      </p>
+    </div>
+  </body>
+</html>
