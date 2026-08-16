@@ -37,10 +37,16 @@ class LandingController {
 		this.manifest = manifest;
 	}
 
-	/** Cities we cover. The root of the crawlable tree. */
+	/**
+	 * Cities we cover. The root of the crawlable tree.
+	 *
+	 * <p>No SPA: the router has no route for this path, and mounting React here
+	 * replaces the rendered list with the not-found screen. Links out of it are
+	 * ordinary navigations, which for an entry point is what they should be.
+	 */
 	@GetMapping("/orter")
 	String cities(Model model) {
-		model.addAllAttributes(manifest.assets());
+		model.addAllAttributes(manifest.assets(false));
 		model.addAttribute("cities", repository.cities());
 		model.addAttribute("canonical", publicUrl + "/orter");
 		model.addAttribute("title", "Boka tid — orter");
@@ -76,7 +82,8 @@ class LandingController {
 
 		String cityName = providers.get(0).city();
 
-		model.addAllAttributes(manifest.assets());
+		// Also no SPA, for the same reason as /orter.
+		model.addAllAttributes(manifest.assets(false));
 		model.addAttribute("providers", providers);
 		model.addAttribute("cityName", cityName);
 		model.addAttribute("category", resolved);
@@ -99,7 +106,11 @@ class LandingController {
 		LandingRepository.ProviderRow provider = repository.provider(slug)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
-		model.addAllAttributes(manifest.assets());
+		// This one DOES mount the SPA: /salong/{slug} is a real route, and the
+		// interactive slot picker is the point of the page. React replacing the
+		// server-rendered markup here is intended -- it renders the same facts
+		// plus live times.
+		model.addAllAttributes(manifest.assets(true));
 		model.addAttribute("provider", provider);
 		model.addAttribute("services", repository.servicesOf(provider.id()));
 		model.addAttribute("canonical", publicUrl + "/salong/" + provider.slug());

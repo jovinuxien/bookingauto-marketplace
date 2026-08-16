@@ -18,6 +18,16 @@ marketplace:
     # Reads: availability, from the web image.
     base-url: ${MARKETPLACE_CAL_BASE_URL:http://localhost:3000}
 
+    # Cal's database, read-only, for importing what a salon set up in Cal's UI
+    # (ADR 0010). Defaulted to the same CAL_DB_PASSWORD that docker-compose and
+    # .env already carry -- it previously defaulted to empty, which meant the
+    # application could not start at all unless the operator happened to export
+    # a variable documented nowhere.
+    datasource:
+      url: ${MARKETPLACE_CAL_DATASOURCE_URL:jdbc:postgresql://localhost:5442/calendso}
+      username: ${MARKETPLACE_CAL_DATASOURCE_USERNAME:cal}
+      password: ${MARKETPLACE_CAL_DATASOURCE_PASSWORD:${CAL_DB_PASSWORD:}}
+
     # Writes: confirm and cancel, from api-v2.
     #
     # Separate because they are separate deployments, not because it is tidy.
@@ -25,7 +35,10 @@ marketplace:
     # authenticated confirm or cancel, so the funnel's compensations live here
     # and nowhere else. Leave this blank and confirm/cancel throw rather than
     # no-op — a cancellation reported but not performed strands a real slot.
-    api-v2-url: ${MARKETPLACE_CAL_API_V2_URL:}
+    # Defaulted to what docker-compose publishes. api-v2 is part of the stack
+    # now, so requiring this to be set by hand only produced funnels that could
+    # reserve and not cancel.
+    api-v2-url: ${MARKETPLACE_CAL_API_V2_URL:http://localhost:3001}
     api-key: ${MARKETPLACE_CAL_API_KEY:}
 
     webhook-secret: ${MARKETPLACE_CAL_WEBHOOK_SECRET:}
@@ -47,10 +60,16 @@ marketplace:
       methods: swish,card
 
   notifications:
-    # 'log' writes to the log and delivers nothing. Sending is opt-in, because
-    # a machine that starts emailing real customers by accident is worse than
-    # one that stays quiet.
-    transport: ${MARKETPLACE_NOTIFICATIONS_TRANSPORT:log}
+    # SMTP by default, at spring.mail.host -- which itself defaults to
+    # localhost, where docker-compose runs MailHog.
+    #
+    # The earlier default of 'log' was safe and useless: notifications appeared
+    # to be broken because nothing ever arrived. Defaulting to SMTP is safe for
+    # the reason that matters -- localhost has no relay in production, so a
+    # misconfigured deployment fails loudly into the outbox and retries, and
+    # reaching real customers still requires deliberately pointing MAIL_HOST at
+    # a real server. Set 'log' to silence delivery entirely.
+    transport: ${MARKETPLACE_NOTIFICATIONS_TRANSPORT:smtp}
     from: ${MARKETPLACE_NOTIFICATIONS_FROM:no-reply@example.se}
     interval-ms: ${MARKETPLACE_NOTIFICATIONS_INTERVAL_MS:15000}
     max-attempts: 8

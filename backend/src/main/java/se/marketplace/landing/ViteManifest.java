@@ -58,11 +58,24 @@ class ViteManifest {
 		this.stylesheets = resolvedStyles;
 	}
 
-	Map<String, Object> assets() {
+	/**
+	 * @param mountSpa whether this page should boot the SPA at all
+	 *
+	 * <p>Not every server-rendered page wants it. React mounts into
+	 * {@code #root} and <strong>replaces whatever is there</strong>, so booting
+	 * it on a page the router has no route for wipes the rendered content and
+	 * renders the not-found screen instead. That is precisely what happened to
+	 * {@code /orter} and {@code /frisor/{city}}: correct HTML on the wire,
+	 * "Sidan finns inte" in the browser.
+	 *
+	 * <p>Stylesheets are always included — they style the server-rendered markup
+	 * whether or not any JavaScript runs.
+	 */
+	Map<String, Object> assets(boolean mountSpa) {
 		return Map.of(
 			"script", script == null ? "" : "/" + script,
 			"stylesheets", stylesheets.stream().map(sheet -> "/" + sheet).toList(),
-			"hasBundle", script != null);
+			"hasBundle", script != null && mountSpa);
 	}
 
 }

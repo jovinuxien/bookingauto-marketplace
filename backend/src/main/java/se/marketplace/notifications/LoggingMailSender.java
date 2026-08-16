@@ -8,14 +8,12 @@ import org.springframework.stereotype.Component;
 /**
  * Writes messages to the log instead of sending them.
  *
- * <p>The default, and deliberately so: a development machine that silently
- * starts emailing real customers because someone restored a production dump is
- * a worse accident than one that sends nothing. Choosing to send has to be
- * explicit.
+ * <p>Opt-in via {@code transport=log}. It was briefly the default, which made
+ * notifications look broken: they were enqueued and dispatched correctly and
+ * simply never arrived anywhere anyone would look.
  */
 @Component
-@ConditionalOnProperty(name = "marketplace.notifications.transport",
-	havingValue = "log", matchIfMissing = true)
+@ConditionalOnProperty(name = "marketplace.notifications.transport", havingValue = "log")
 class LoggingMailSender implements MailSender {
 
 	private static final Logger log = LoggerFactory.getLogger(LoggingMailSender.class);

@@ -18,9 +18,24 @@ is a projection kept fresh by webhooks and a reconciler.
 ## What runs today
 
 ```bash
-cp .env.sample .env          # or keep the generated one
-set -a && . ./.env && set +a
-docker compose up -d
+./run.sh
+```
+
+That is the whole thing: containers, frontend build, backend. Everything the
+application needs is either defaulted in `application.yml` or read from `.env`.
+
+| | |
+|---|---|
+| consumer site | http://localhost:8090 |
+| salon console | http://localhost:8090/logga-in |
+| mail (MailHog) | http://localhost:8026 |
+| Cal | http://localhost:3000 |
+
+Bootstrap the first operator once, then remove the variables:
+
+```bash
+MARKETPLACE_CONSOLE_BOOTSTRAP_ADMIN_EMAIL=you@example.se \
+MARKETPLACE_CONSOLE_BOOTSTRAP_ADMIN_PASSWORD='...' ./run.sh
 ```
 
 | | | |
