@@ -37,6 +37,17 @@ class CalBookingClient implements CalBookingPort {
 	private final String apiV2Url;
 	private final String apiKey;
 
+	/**
+	 * Required by api-v2, and required to be exactly this.
+	 *
+	 * <p>Cal's own documentation for the header says it plainly: "If not set to
+	 * this value, the endpoint will default to an older version." The older
+	 * bookings controller has a cancel route and <em>no confirm route at all</em>,
+	 * so omitting this header does not fail loudly — it silently routes to an API
+	 * where half of what we need is a 404.
+	 */
+	private static final String API_VERSION = "2024-08-13";
+
 	CalBookingClient(
 		@Value("${marketplace.cal.base-url:http://localhost:3000}") String baseUrl,
 		@Value("${marketplace.cal.api-v2-url:}") String apiV2Url,
@@ -110,6 +121,7 @@ class CalBookingClient implements CalBookingPort {
 			http.post()
 				.uri(apiV2Url + "/v2/bookings/" + calBookingUid + "/confirm")
 				.header("Authorization", "Bearer " + apiKey)
+				.header("cal-api-version", API_VERSION)
 				.header("Content-Type", "application/json")
 				.body("{}")
 				.retrieve()
@@ -128,6 +140,7 @@ class CalBookingClient implements CalBookingPort {
 			http.post()
 				.uri(apiV2Url + "/v2/bookings/" + calBookingUid + "/cancel")
 				.header("Authorization", "Bearer " + apiKey)
+				.header("cal-api-version", API_VERSION)
 				.header("Content-Type", "application/json")
 				.body("{\"cancellationReason\":" + quote(reason) + "}")
 				.retrieve()

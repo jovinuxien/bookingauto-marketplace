@@ -84,12 +84,39 @@ curl "http://localhost:8090/api/search?lat=59.32&lon=18.06&radius=5000&day=2026-
 ## Layout
 
 ```
-docker-compose.yml     cal + two databases
-db/                    marketplace schema, applied on first start
+docker-compose.yml     cal, cal-api (v2), redis, two databases
+db/                    marketplace schema; 002 is applied by hand
+docker/                build-api-v2.sh — no published image exists
 seed/                  dev fixtures — cal-dev.sh seeds both sides
 docs/decisions/        ADRs — why, not what
-backend/               Spring Modulith: search, sync
+docs/design/           booking-funnel.md — the saga, stage by stage
+backend/               Spring Modulith: search, sync, booking, payments
 ```
+
+## Cal's api-v2
+
+Availability reads work against the web image. **The booking funnel does not**:
+that image serves a public booking-create endpoint and no authenticated confirm
+or cancel, so a funnel running without api-v2 can reserve a slot and never
+release it. Every failed payment then strands a pending booking that blocks a
+real slot, permanently.
+
+There is no published image, so it is built from the monorepo — tens of minutes
+and several GB:
+
+```bash
+./docker/build-api-v2.sh              # clone + build, pinned to the web image version
+docker compose up -d cal-redis cal-api
+./seed/cal-api-key.sh salong-sodermalm # prints the key once; it is stored hashed
+
+export MARKETPLACE_CAL_API_V2_URL=http://localhost:3001
+export MARKETPLACE_CAL_API_KEY=cal_...
+```
+
+Two things that fail silently if got wrong. The api-v2 version **must match the
+web image** — they share one database and one schema. And every request must
+carry `cal-api-version: 2024-08-13`; without it Cal routes to an older
+controller that has a cancel route and no confirm route at all.
 
 ## The three decisions that shape everything
 

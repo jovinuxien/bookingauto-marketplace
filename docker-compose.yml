@@ -81,6 +81,57 @@ services:
       timeout: 5s
       retries: 12
 
+  # ------------------------------------------------------------- cal api-v2 --
+  # Cal's authenticated REST API, as a separate service.
+  #
+  # This exists for one reason: the web image serves a PUBLIC booking-create
+  # endpoint but no authenticated confirm or cancel. A funnel that can reserve
+  # and cannot take it back strands a pending booking on every failed payment,
+  # blocking a real slot with no automated way to release it.
+  #
+  # No image is published for it, so it must be built first:
+  #   ./docker/build-api-v2.sh
+  #
+  # Pinned to the same version as the web image. They share one database and one
+  # schema; a version mismatch is a migration skew between two things that
+  # cannot be allowed to disagree.
+  cal-api:
+    image: bm/cal-api-v2:v6.2.0
+    container_name: bm-cal-api
+    depends_on:
+      cal-db:
+        condition: service_healthy
+      cal-redis:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      API_PORT: "5555"
+      API_URL: http://localhost
+      DATABASE_URL: postgresql://cal:${CAL_DB_PASSWORD}@cal-db:5432/calendso
+      DATABASE_DIRECT_URL: postgresql://cal:${CAL_DB_PASSWORD}@cal-db:5432/calendso
+      DATABASE_READ_URL: postgresql://cal:${CAL_DB_PASSWORD}@cal-db:5432/calendso
+      DATABASE_WRITE_URL: postgresql://cal:${CAL_DB_PASSWORD}@cal-db:5432/calendso
+      # Must match the web app's, or tokens minted by one are rejected by the
+      # other.
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?set NEXTAUTH_SECRET in .env}
+      CALENDSO_ENCRYPTION_KEY: ${CALENDSO_ENCRYPTION_KEY:?set CALENDSO_ENCRYPTION_KEY in .env}
+      JWT_SECRET: ${NEXTAUTH_SECRET}
+      REDIS_URL: redis://cal-redis:6379
+      WEB_APP_URL: http://localhost:3000
+      # Team billing off: it is a Stripe-backed feature we do not use, and
+      # leaving it on makes the service demand credentials at boot.
+      IS_TEAM_BILLING_ENABLED: "false"
+      STRIPE_API_KEY: ""
+      STRIPE_WEBHOOK_SECRET: ""
+    ports:
+      - "3001:5555"
+
+  # Required by api-v2 for caching. Separate from anything the marketplace does.
+  cal-redis:
+    image: redis:7-alpine
+    container_name: bm-cal-redis
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+
 volumes:
   cal-db:
   market-db:

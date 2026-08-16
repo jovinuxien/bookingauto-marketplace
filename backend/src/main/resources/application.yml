@@ -10,6 +10,32 @@ spring:
     hikari:
       maximum-pool-size: 10
 
+marketplace:
+  cal:
+    # Reads: availability, from the web image.
+    base-url: ${MARKETPLACE_CAL_BASE_URL:http://localhost:3000}
+
+    # Writes: confirm and cancel, from api-v2.
+    #
+    # Separate because they are separate deployments, not because it is tidy.
+    # The web image serves a public booking-create endpoint and no
+    # authenticated confirm or cancel, so the funnel's compensations live here
+    # and nowhere else. Leave this blank and confirm/cancel throw rather than
+    # no-op — a cancellation reported but not performed strands a real slot.
+    api-v2-url: ${MARKETPLACE_CAL_API_V2_URL:}
+    api-key: ${MARKETPLACE_CAL_API_KEY:}
+
+    webhook-secret: ${MARKETPLACE_CAL_WEBHOOK_SECRET:}
+    timezone: Europe/Stockholm
+
+  # Basis points, frozen onto each attempt at quote time so a rate change
+  # cannot retroactively alter a sale already in flight.
+  commission-bps: 1500
+
+  payments:
+    # 'dev' moves no money. Never set this anywhere real.
+    gateway: ${MARKETPLACE_PAYMENTS_GATEWAY:dev}
+
 server:
   port: 8090
 
