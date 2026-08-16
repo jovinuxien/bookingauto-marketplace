@@ -36,7 +36,13 @@ class PostgisSearch implements SearchPort {
 		   AND a.has_capacity
 		   AND s.active
 		   AND p.status = 'active'
-		   AND (:category IS NULL OR s.category_slug = :category)
+		   -- Cast is load-bearing. Without it, an omitted category reaches
+		   -- Postgres as an untyped NULL in "$n IS NULL", which it cannot
+		   -- infer a type for, and the whole query fails at prepare time with
+		   -- "could not determine data type of parameter". The bug only
+		   -- appears when the filter is left out, so it hides from any test
+		   -- that always passes a category.
+		   AND (CAST(:category AS text) IS NULL OR s.category_slug = :category)
 		   AND (:anyTime OR
 		        (:morning   AND a.free_morning)   OR
 		        (:afternoon AND a.free_afternoon) OR

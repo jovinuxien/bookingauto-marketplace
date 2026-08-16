@@ -32,8 +32,7 @@ class AvailabilityReconcilerTest {
 	}
 
 	private static Slot slot(String isoLocal) {
-		Instant start = at(isoLocal);
-		return new Slot(start, start.plusSeconds(45 * 60));
+		return new Slot(at(isoLocal));
 	}
 
 	private static DayAvailability dayOf(List<DayAvailability> days, String date) {

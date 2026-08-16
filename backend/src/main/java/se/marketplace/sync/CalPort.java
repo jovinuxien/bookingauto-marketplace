@@ -11,12 +11,13 @@ import java.util.List;
  * leaks into the rest of the system, and the less true it becomes that replacing
  * it is a bounded change.
  *
- * <p><strong>Deployment note.</strong> The implementation targets Cal's v2 API,
- * which is <em>not</em> part of the {@code calcom/cal.com} Docker image — that
- * image ships {@code apps/web} only, and {@code /api/v2/*} returns 500 against
- * it. The v2 API is a separate NestJS application ({@code @calcom/api-v2}) with
- * its own Dockerfile in the repository and has to be built and run alongside.
- * Worth knowing before an architecture is drawn on top of {@code /v2/*}.
+ * <p><strong>Deployment note.</strong> Cal's v2 REST API is <em>not</em> part of
+ * the {@code calcom/cal.com} Docker image — that image ships {@code apps/web}
+ * only, and {@code /api/v2/*} returns 500 against it. Worth knowing before an
+ * architecture is drawn on top of {@code /v2/*}. Reads therefore go through an
+ * endpoint the web image does serve; see {@link CalSlotsClient} for what that
+ * costs. Booking writes will have to face the same question, and their answer
+ * need not be the same one.
  */
 public interface CalPort {
 
@@ -29,7 +30,16 @@ public interface CalPort {
 	 */
 	List<Slot> slots(long calEventTypeId, Instant from, Instant to);
 
-	record Slot(Instant start, Instant end) {}
+	/**
+	 * A start time, and only a start time.
+	 *
+	 * <p>Cal's slot payload carries no end: duration is a property of the event
+	 * type, not of the slot. An end here would therefore be derived rather than
+	 * observed, and nothing in this module reads one — so it is left out instead
+	 * of computed. Anything that needs the finish time should take the duration
+	 * from the service and be explicit that it is doing arithmetic.
+	 */
+	record Slot(Instant start) {}
 
 	/**
 	 * What the reconciler writes back for one service and day.

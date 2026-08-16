@@ -41,29 +41,44 @@ between running the image and building from source.
 
 ## What is real, and what is a sketch
 
-Real and verified:
+Real and verified end to end — Cal's real availability now reaches the search
+API without anything hand-written in between:
 
-- Both databases up, `db/001-availability-index.sql` applied on first start
-- PostGIS 3.4 working
-- **The core product query runs.** Seeded three salons and asked the actual
-  question — colour, day after tomorrow, afternoon, within 5 km of a point in
-  Stockholm — and got the two Stockholm salons back ordered by distance, with
-  Göteborg correctly excluded
-- Cal.diy healthy, serving, schema migrated
+- Three salons seeded in **Cal** (users, schedules, bookable event types) and
+  matched to marketplace providers by slug
+- **The reconciler fills the index from Cal.** 14 days per service, every day
+  written — including the Sundays, as `has_capacity = false`, because a missing
+  row cannot be told apart from one never computed
+- **The core product query runs.** Saturday afternoon within 5 km of a point in
+  Stockholm returns the two Stockholm salons ordered by distance; Göteborg is
+  excluded at 5 km and appears at 600 km, 397 km out. Sunday returns nothing,
+  because Cal says the salons are closed
+- **The webhook loop closes.** A signed delivery is recorded, marks the service
+  stale, and the reconciler refreshes it within one interval — observed at ~45s.
+  Bad and missing signatures are rejected 401 and still recorded
+- Both databases up, PostGIS 3.4 working, Cal.diy healthy and migrated
 
 Sketch:
 
-- `services/sync` is a README and a boundary, not an implementation
-- `marketplace-api`, `search` and `payments` do not exist yet
+- Bookings, payments and provider onboarding do not exist yet
 - No frontend
+- Cal's v2 REST API is not deployed, and availability does not need it — see
+  ADR 0007
+
+```bash
+./seed/cal-dev.sh                              # supply, both sides
+cd backend && mvn spring-boot:run              # reconciler fills the index
+curl "http://localhost:8090/api/search?lat=59.32&lon=18.06&radius=5000&day=2026-08-22&when=AFTERNOON"
+```
 
 ## Layout
 
 ```
 docker-compose.yml     cal + two databases
 db/                    marketplace schema, applied on first start
+seed/                  dev fixtures — cal-dev.sh seeds both sides
 docs/decisions/        ADRs — why, not what
-services/sync/         the only Cal-aware component
+backend/               Spring Modulith: search, sync
 ```
 
 ## The three decisions that shape everything
@@ -104,12 +119,15 @@ geo support at all, and geo is this product's primary filter.
 
 In the order worth doing it:
 
-1. Provider onboarding — Team + staff + services + Stripe KYC in one flow.
-   Nothing works before supply exists.
-2. The reconciler in `services/sync`, with tests. It is the mechanism;
-   webhooks are a latency optimisation over it.
-3. The booking funnel, with the confirm-against-Cal step made explicit.
-4. Payments.
+1. The booking funnel, with the confirm-against-Cal step made explicit. This
+   is the first write against Cal, and it is where ADR 0007 has to be answered
+   again — a write may justify building `api-v2` even though reads did not.
+2. Provider onboarding — Team + staff + services + Stripe KYC in one flow,
+   replacing `seed/cal-dev.sql`, which writes Cal's schema directly and is a
+   dev shortcut rather than a mechanism.
+3. Payments.
+
+Done: the reconciler in `backend/.../sync`, with tests.
 
 ## Known shape problems, recorded early
 

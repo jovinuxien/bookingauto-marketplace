@@ -3,6 +3,10 @@
 --
 --   docker exec -i bm-market-db psql -U market -d marketplace < seed/dev.sql
 --
+-- Run seed/cal-dev.sh first: this file references Cal event type ids, and
+-- pointing a service at an event type Cal does not have produces an empty
+-- slot map, which is indistinguishable from a fully booked salon.
+--
 -- Three salons: two in Stockholm a couple of kilometres apart, one in Göteborg
 -- that any "near me in Stockholm" search must exclude. That third row is the
 -- point of the fixture — a geo filter that returns everything looks identical
@@ -14,14 +18,25 @@ INSERT INTO provider (cal_team_id, slug, name, status, city, location) VALUES
   (103, 'goteborg-harstudio', 'Göteborg Hårstudio', 'active', 'Göteborg',  ST_MakePoint(11.9746, 57.7089)::geography)
 ON CONFLICT (cal_team_id) DO NOTHING;
 
+-- Matched to Cal by slug rather than by arithmetic on the id. The two id
+-- sequences are independent and only happen to line up on a fresh pair of
+-- databases; a seed that relies on that coincidence breaks silently the first
+-- time either side is seeded twice.
 INSERT INTO service (provider_id, cal_event_type_id, name, category_slug, duration_minutes, price_minor)
-SELECT id, 200 + id, 'Färgning 45 min', 'har', 45, 60000 FROM provider
+SELECT p.id, c.cal_event_type_id, 'Färgning 45 min', 'har', 45, 60000
+FROM provider p
+JOIN (VALUES
+        ('salong-sodermalm',   1),
+        ('klinik-vasastan',    2),
+        ('goteborg-harstudio', 3)
+     ) AS c(slug, cal_event_type_id) ON c.slug = p.slug
 ON CONFLICT (cal_event_type_id) DO NOTHING;
 
--- Availability two days out, afternoons only. In production these rows come
--- from the reconciler; here they stand in for it.
-INSERT INTO availability_day
-  (provider_id, service_id, day, has_capacity, first_free_at, free_slots, free_morning, free_afternoon, source)
-SELECT s.provider_id, s.id, current_date + 2, true, now() + interval '2 day', 4, false, true, 'backfill'
-FROM service s
-ON CONFLICT (service_id, day) DO NOTHING;
+-- availability_day is deliberately NOT seeded.
+--
+-- It used to be, back when the reconciler was a README. Now that the mechanism
+-- exists, hand-written rows are worse than no rows: they make search return
+-- results whether or not sync works, which is precisely the failure the index
+-- was built to make visible. Start the backend and let the reconciler fill it —
+-- services with no rows count as maximally stale and are picked up on the first
+-- pass.
