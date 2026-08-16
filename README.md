@@ -257,6 +257,25 @@ mvn -Dskip.npm=false package   # or let Maven do it
 
 Backend-only builds pass `-Dskip.npm=true`, which is the default.
 
+## Tests
+
+```bash
+cd backend
+mvn test              # 38 — logic, module boundaries, every compensation path
+npx playwright test   # 11 — what a person actually sees, needs a running stack
+```
+
+The browser suite exists for one reason. The landing pages once returned
+correct HTML with a 200 on every URL, and showed "Sidan finns inte" in a
+browser: the SPA mounted into the element the server had rendered into and the
+router had no matching route. Nothing else here runs JavaScript, so nothing
+else could have caught it — verified by reintroducing the bug and watching curl
+stay green while the browser tests failed.
+
+It uses the Chrome already installed rather than downloading its own, and steps
+forward to an open day rather than assuming today is one: the seeded salons are
+closed at weekends, and a suite that fails two days in seven gets ignored.
+
 ## The security model
 
 Adding Spring Security made everything deny-by-default, so the public surface is
