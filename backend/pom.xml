@@ -21,6 +21,10 @@
   <properties>
     <java.version>21</java.version>
     <spring-modulith.version>1.2.4</spring-modulith.version>
+
+    <!-- Default true so the ordinary build stays fast. The frontend is built
+         explicitly, with -Dskip.npm=false, when a deployable jar is wanted. -->
+    <skip.npm>true</skip.npm>
   </properties>
 
   <dependencies>
@@ -87,6 +91,46 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+
+      <!--
+        Builds the SPA into target/classes/static, so the jar is the whole
+        deployable: one artefact, one origin, no CORS, and no second deployment
+        that can drift out of step with the API it depends on.
+
+        Skipped with -Dskip.npm=true, which every backend-only build should use.
+        Node is downloaded rather than assumed, so a build machine needs nothing
+        installed beyond a JDK.
+      -->
+      <plugin>
+        <groupId>com.github.eirslett</groupId>
+        <artifactId>frontend-maven-plugin</artifactId>
+        <version>1.15.1</version>
+        <configuration>
+          <nodeVersion>v20.16.0</nodeVersion>
+          <npmVersion>10.8.1</npmVersion>
+          <installDirectory>target</installDirectory>
+          <skip>${skip.npm}</skip>
+        </configuration>
+        <executions>
+          <execution>
+            <id>install-node-and-npm</id>
+            <goals><goal>install-node-and-npm</goal></goals>
+            <phase>generate-resources</phase>
+          </execution>
+          <execution>
+            <id>npm-install</id>
+            <goals><goal>npm</goal></goals>
+            <phase>generate-resources</phase>
+            <configuration><arguments>install --no-audit --no-fund</arguments></configuration>
+          </execution>
+          <execution>
+            <id>npm-build</id>
+            <goals><goal>npm</goal></goals>
+            <phase>prepare-package</phase>
+            <configuration><arguments>run build</arguments></configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

@@ -87,6 +87,11 @@ API without anything hand-written in between:
   indexed by the reconciler in ~5s, and appeared **first in search at 361 m**
 - Module boundaries are verified by a test. It caught a real cycle the moment it
   was added
+- **The consumer site exists.** React + TypeScript SPA in the JHipster layout —
+  Redux Toolkit, react-router, axios interceptors — built by Maven into
+  `target/classes/static` and served from the same jar, so there is one artefact
+  and one origin. Search → salon → real times from Cal → checkout, with each
+  funnel outcome given its own screen
 - 34 tests
 
 Sketch:
@@ -117,6 +122,7 @@ seed/                  dev fixtures — cal-dev.sh seeds both sides
 docs/decisions/        ADRs — why, not what
 docs/design/           booking-funnel.md — the saga, stage by stage
 backend/               Spring Modulith: search, sync, booking, payments, onboarding
+  src/main/webapp/app/ React SPA — config/, shared/, modules/; built into the jar
 ```
 
 ## Cal's api-v2
@@ -182,12 +188,13 @@ geo support at all, and geo is this product's primary filter.
 
 In the order worth doing it:
 
-1. The frontends. Everything below the API exists; nothing above it does, and a
-   marketplace with no consumer site is not testable by anyone but us.
+1. Prerendering the landing pages. The SPA is client-rendered, so city and
+   service pages — how a marketplace is actually found — do not rank. See the
+   amendment to ADR 0004; the fix is narrow and does not touch the journey.
 2. A Stripe test account, to verify the half that `stripe-mock` cannot: real
    Swish redirection, webhook signatures, Connect onboarding, payouts.
-3. Notifications — the salon currently learns about a booking only from Cal's
-   own email.
+3. The business console, for salons. Same layout as the consumer SPA, and the
+   one place this architecture costs nothing at all.
 
 Done: the availability reconciler, the booking funnel with its compensations,
 Stripe Connect with the asynchronous payment path, and provider onboarding.
@@ -207,3 +214,14 @@ Stripe Connect with the asynchronous payment path, and provider onboarding.
 - **Availability accuracy is a product metric.** `availability_miss` exists to
   record "shown as available, turned out not to be". It quietly decides whether
   consumers come back and is invisible unless measured.
+
+## Running the frontend
+
+```bash
+cd backend && npm install
+npx vite            # dev server on :3002, proxies /api to :8090
+npx vite build      # builds into target/classes/static
+mvn -Dskip.npm=false package   # or let Maven do it
+```
+
+Backend-only builds pass `-Dskip.npm=true`, which is the default.

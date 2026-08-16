@@ -33,6 +33,29 @@ it.
 - Team fluency is a first-order input, not a detail. An unfamiliar runtime costs
   more than shared types save.
 
+> **Amendment — the SPA is served from the Spring Boot jar.** Adopted at the
+> team's request, matching the JHipster-style layout they already run in
+> `litemall-gateway-admin`: React and TypeScript under `src/main/webapp/app`
+> with `config/` (Redux Toolkit store, axios interceptors), `shared/` (layout,
+> reducers, model) and `modules/` as feature folders, built by
+> `frontend-maven-plugin` into `target/classes/static`.
+>
+> The gains are real: one artefact, one origin, no CORS, no second deployment
+> that can drift out of step with the API, and a structure the team already
+> maintains elsewhere.
+>
+> **The cost is the SEO argument below.** This is client-rendered, so a crawler
+> gets an empty `<div id="root">`. For an admin console — which is what
+> `litemall-gateway-admin` is — that costs nothing. For the consumer site, city
+> and service landing pages are how a marketplace is found, and they will not
+> rank as they stand.
+>
+> Recorded rather than resolved. The mitigation, when it matters, is narrow:
+> prerender only the landing pages, either as static HTML generated at build
+> time or behind a small rendering service, and leave the booking journey a SPA.
+> That keeps this layout and buys back the pages that actually need indexing —
+> a much smaller change than moving the whole frontend to server rendering.
+
 ## Why TypeScript for the frontend, without exception
 
 - The consumer site must be server-rendered: city-plus-service landing pages are
