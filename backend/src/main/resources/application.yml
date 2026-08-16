@@ -35,6 +35,20 @@ marketplace:
   payments:
     # 'dev' moves no money. Never set this anywhere real.
     gateway: ${MARKETPLACE_PAYMENTS_GATEWAY:dev}
+    stripe:
+      api-key: ${MARKETPLACE_PAYMENTS_STRIPE_API_KEY:}
+      # Point at stripe-mock to exercise request shapes without credentials.
+      # Blank means the real Stripe.
+      base-url: ${MARKETPLACE_PAYMENTS_STRIPE_BASE_URL:}
+      webhook-secret: ${MARKETPLACE_PAYMENTS_STRIPE_WEBHOOK_SECRET:}
+      methods: swish,card
+
+  checkout:
+    # Nobody sends a webhook for a customer who simply walked away, so this is
+    # what returns their slot. Errs long: reselling a slot someone has just paid
+    # for is far worse than holding one a few minutes too many.
+    abandon-after-seconds: ${MARKETPLACE_CHECKOUT_ABANDON_AFTER_SECONDS:900}
+    sweep-interval-ms: ${MARKETPLACE_CHECKOUT_SWEEP_INTERVAL_MS:60000}
 
 server:
   port: 8090

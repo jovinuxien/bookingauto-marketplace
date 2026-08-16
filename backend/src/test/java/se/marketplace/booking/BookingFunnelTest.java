@@ -247,6 +247,84 @@ class BookingFunnelTest {
 		assertThat(outcome.needsAttention()).isTrue();
 	}
 
+	// ------------------------------------------- payments that do not settle --
+
+	@Test
+	@DisplayName("a payment awaiting the customer does not complete the sale")
+	void awaitingPaymentIsNotASale() {
+		payments.requiresAction = true;
+
+		BookingFunnel.Outcome outcome = book();
+
+		assertThat(outcome.awaitingPayment()).isTrue();
+		assertThat(outcome.sold()).isFalse();
+		// The slot stays held and nothing is confirmed. Reporting success here
+		// is a lie a Swish customer discovers at the salon door.
+		assertThat(cal.confirmed).isEmpty();
+		assertThat(cal.cancelled).isEmpty();
+		assertThat(outcome.clientSecret()).isEqualTo("secret_1");
+	}
+
+	@Test
+	@DisplayName("the webhook finishes the sale the request could not")
+	void webhookCompletesTheSale() {
+		payments.requiresAction = true;
+		book();
+
+		BookingFunnel.Outcome outcome = funnel.paymentSucceeded("pi_1", "ch_live_1");
+
+		assertThat(outcome.sold()).isTrue();
+		assertThat(published).hasSize(1);
+	}
+
+	@Test
+	@DisplayName("a redelivered success does not sell twice")
+	void redeliveredSuccessIsIgnored() {
+		payments.requiresAction = true;
+		book();
+		funnel.paymentSucceeded("pi_1", "ch_live_1");
+
+		BookingFunnel.Outcome again = funnel.paymentSucceeded("pi_1", "ch_live_1");
+
+		// Stripe redelivers on any non-2xx and reorders freely, so this has to be
+		// a normal answer rather than a second booking.
+		assertThat(again.state()).isEqualTo(AttemptState.CONFIRMED);
+		assertThat(published).hasSize(1);
+	}
+
+	@Test
+	@DisplayName("a failed payment releases the slot")
+	void webhookFailureReleasesTheSlot() {
+		payments.requiresAction = true;
+		book();
+
+		BookingFunnel.Outcome outcome = funnel.paymentFailed("pi_1", "customer declined in app");
+
+		assertThat(outcome.state()).isEqualTo(AttemptState.CHARGE_FAILED);
+		assertThat(cal.cancelled).containsExactly("cal-uid-1");
+	}
+
+	@Test
+	@DisplayName("an abandoned checkout releases the slot without any webhook")
+	void abandonedCheckoutIsSwept() {
+		payments.requiresAction = true;
+		book();
+
+		// Nobody ever tells us about a customer who simply walked away, which is
+		// why the sweeper is the mechanism and the webhook is the optimisation.
+		BookingFunnel.Outcome outcome =
+			funnel.releaseAbandoned(repository.current, "checkout abandoned");
+
+		assertThat(outcome.state()).isEqualTo(AttemptState.CHARGE_FAILED);
+		assertThat(cal.cancelled).containsExactly("cal-uid-1");
+	}
+
+	@Test
+	@DisplayName("an unknown payment intent is ignored, not an error")
+	void unknownIntentIsIgnored() {
+		assertThat(funnel.paymentSucceeded("pi_not_ours", "ch")).isNull();
+	}
+
 	// ----------------------------------------------------------- idempotency --
 
 	@Test
@@ -273,7 +351,7 @@ class BookingFunnelTest {
 
 		private final List<AttemptState> transitions = new ArrayList<>();
 		private Attempt started;
-		private Attempt current;
+		Attempt current;
 		private int misses;
 		private boolean sealed;
 
@@ -287,7 +365,8 @@ class BookingFunnelTest {
 
 		@Override
 		Optional<ServiceForSale> findServiceForSale(long serviceId) {
-			return Optional.of(new ServiceForSale(1L, 1L, 1L, 60000, "SEK", 45, true, true));
+			return Optional.of(new ServiceForSale(
+				1L, 1L, 1L, 60000, "SEK", 45, true, true, "acct_test", true));
 		}
 
 		@Override
@@ -300,7 +379,7 @@ class BookingFunnelTest {
 			started = new Attempt(1L, request.idempotencyKey(), request.providerId(),
 				request.serviceId(), request.slotStart(), request.priceMinor(),
 				request.commissionMinor(), request.currency(), request.customerEmail(),
-				request.customerName(), AttemptState.STARTED, null, null, null, null);
+				request.customerName(), AttemptState.STARTED, null, null, null, null, null, null);
 			current = started;
 			return started;
 		}
@@ -313,7 +392,11 @@ class BookingFunnelTest {
 				throw new IllegalStateException("illegal transition " + attempt.state() + " -> " + to);
 			}
 			transitions.add(to);
-			current = attempt.withState(to);
+			// Mirrors the real UPDATE, which sets the state column and nothing
+			// else. Rebuilding from the caller's copy instead dropped fields
+			// recorded since — the uid among them — and made the webhook resume
+			// look broken when only the fake was.
+			current = current.withState(to);
 			if (to.isTerminal()) {
 				sealed = true;
 			}
@@ -326,12 +409,25 @@ class BookingFunnelTest {
 		}
 
 		@Override
-		void recordCalUid(long attemptId, String uid) {
+		void recordReservation(long attemptId, String uid, Instant end, String status) {
 			current = new Attempt(current.id(), current.idempotencyKey(), current.providerId(),
 				current.serviceId(), current.slotStart(), current.priceMinor(),
 				current.commissionMinor(), current.currency(), current.customerEmail(),
-				current.customerName(), current.state(), uid, current.paymentRef(), null, null);
+				current.customerName(), current.state(), uid, current.paymentRef(), null, null,
+				end, status);
 		}
+
+		@Override
+		void recordPaymentIntent(long attemptId, String intentId) {
+			intents.put(intentId, attemptId);
+		}
+
+		@Override
+		Optional<Attempt> findByPaymentIntent(String intentId) {
+			return intents.containsKey(intentId) ? Optional.of(current) : Optional.empty();
+		}
+
+		private final java.util.Map<String, Long> intents = new java.util.HashMap<>();
 
 		@Override
 		void recordPayment(long attemptId, String reference) {
@@ -410,6 +506,7 @@ class BookingFunnelTest {
 		boolean refuse;
 		boolean unavailable;
 		boolean refundFails;
+		boolean requiresAction;
 
 		int charged;
 		final List<String> refunded = new ArrayList<>();
@@ -423,7 +520,11 @@ class BookingFunnelTest {
 				throw new PaymentUnavailable("gateway timeout");
 			}
 			charged++;
-			return new Charge("charge-1", request.amountMinor(), request.currency());
+			if (requiresAction) {
+				return new Charge("pi_1", request.amountMinor(), request.currency(),
+					Status.REQUIRES_ACTION, "secret_1");
+			}
+			return Charge.settled("charge-1", request.amountMinor(), request.currency());
 		}
 
 		@Override

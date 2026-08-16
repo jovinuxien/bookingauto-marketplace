@@ -132,6 +132,19 @@ services:
     container_name: bm-cal-redis
     command: ["redis-server", "--save", "", "--appendonly", "no"]
 
+  # ------------------------------------------------------------ stripe-mock --
+  # Stripe's own mock server. Answers the API with fixtures and validates
+  # nothing about the business, so it proves our requests are well formed and
+  # nothing else -- a green run here is not evidence that payments work.
+  #
+  # Worth having anyway: it catches wrong parameter names, wrong types and
+  # missing required fields without needing credentials or a Stripe account.
+  stripe-mock:
+    image: stripe/stripe-mock:v0.202.0
+    container_name: bm-stripe-mock
+    ports:
+      - "12111:12111"
+
 volumes:
   cal-db:
   market-db:

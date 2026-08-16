@@ -71,10 +71,21 @@ API without anything hand-written in between:
 - 27 tests, covering every compensation path including the ones that only run
   after a compensation itself fails
 
+- **Payments are wired to Stripe Connect** as destination charges — commission
+  as an application fee, the balance destined for the salon's account. Verified
+  against `stripe-mock`: `amount 60000`, `application_fee_amount 9000`,
+  `payment_method_types [swish card]`, `transfer_data.destination`
+- **The funnel can wait.** Swish is a push payment, so a checkout returns
+  `202 AWAITING_PAYMENT` with a client secret; a webhook completes the sale, a
+  redelivery is a no-op, and an abandoned checkout is swept — slot held 12 → 11,
+  returned 11 → 12, with no webhook involved
+- 33 tests
+
 Sketch:
 
-- Payments run through a dev gateway that moves no money; Stripe Connect is not
-  wired
+- Stripe is exercised only against `stripe-mock`, which validates request shape
+  and nothing else. Real Swish redirection, webhook signatures, Connect
+  onboarding and payouts need a Stripe test account
 - Provider onboarding and the frontend do not exist yet
 - **Confirming a booking needs a paid Cal licence**, so we create auto-accepting
   event types and never need to. See ADR 0008 — this is the constraint most

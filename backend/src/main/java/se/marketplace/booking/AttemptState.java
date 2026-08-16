@@ -28,6 +28,20 @@ public enum AttemptState {
 	/** The reservation was read back and agreed with what we asked for. */
 	VERIFIED,
 
+	/**
+	 * A PaymentIntent exists and the customer is somewhere in their bank app.
+	 *
+	 * <p>The state that real money forces into the design. Swish is a push
+	 * payment — Stripe returns "requires action", the customer approves in Swish,
+	 * and we hear about it later over a webhook. Cards with 3-D Secure behave the
+	 * same way. So stage 7 cannot be a call that returns success or failure.
+	 *
+	 * <p>Nothing has been charged here, and a slot is being held. Most attempts
+	 * that end up stuck do so in this state, because people abandon checkouts —
+	 * which is why the sweeper exists rather than being a nicety.
+	 */
+	AWAITING_PAYMENT,
+
 	/** Money has moved. */
 	CHARGED,
 
@@ -74,7 +88,11 @@ public enum AttemptState {
 		return switch (this) {
 			case STARTED   -> EnumSet.of(RESERVED, REFUSED, ABANDONED, NEEDS_ATTENTION);
 			case RESERVED  -> EnumSet.of(VERIFIED, VERIFY_FAILED, NEEDS_ATTENTION);
-			case VERIFIED  -> EnumSet.of(CHARGED, CHARGE_FAILED, NEEDS_ATTENTION);
+			// VERIFIED can reach CHARGED directly (a gateway that settles inline)
+			// or wait first. Both are legitimate; which one happens depends on
+			// the payment method, not on us.
+			case VERIFIED  -> EnumSet.of(CHARGED, AWAITING_PAYMENT, CHARGE_FAILED, NEEDS_ATTENTION);
+			case AWAITING_PAYMENT -> EnumSet.of(CHARGED, CHARGE_FAILED, NEEDS_ATTENTION);
 			case CHARGED   -> EnumSet.of(CONFIRMED, CONFIRM_FAILED, NEEDS_ATTENTION);
 			default        -> EnumSet.noneOf(AttemptState.class);
 		};
@@ -111,8 +129,10 @@ public enum AttemptState {
 		return switch (this) {
 			// Nothing has happened outside this system yet.
 			case STARTED -> Compensation.NONE;
-			// Cal is holding a slot for a sale that will not complete.
-			case RESERVED, VERIFIED -> Compensation.CANCEL_RESERVATION;
+			// Cal is holding a slot for a sale that will not complete. Waiting
+			// for payment counts: no money has moved, so releasing the slot is
+			// the whole of the cleanup.
+			case RESERVED, VERIFIED, AWAITING_PAYMENT -> Compensation.CANCEL_RESERVATION;
 			// Money has moved and there is no manual capture to void; see ADR 0005.
 			case CHARGED -> Compensation.REFUND;
 			default -> Compensation.NONE;

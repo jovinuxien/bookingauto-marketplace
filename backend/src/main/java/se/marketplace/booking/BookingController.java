@@ -39,6 +39,11 @@ class BookingController {
 
 		HttpStatus status = switch (outcome.state()) {
 			case CONFIRMED -> HttpStatus.CREATED;
+			// Accepted, not created. The slot is held and a PaymentIntent
+			// exists, but the customer still has to approve it in their bank
+			// app — so the client's job is to take the clientSecret and finish,
+			// not to show a confirmation.
+			case AWAITING_PAYMENT -> HttpStatus.ACCEPTED;
 			case REFUSED, VERIFY_FAILED -> HttpStatus.CONFLICT;
 			case CHARGE_FAILED -> HttpStatus.PAYMENT_REQUIRED;
 			case NEEDS_ATTENTION -> HttpStatus.INTERNAL_SERVER_ERROR;

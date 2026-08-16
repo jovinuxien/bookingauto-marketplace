@@ -19,7 +19,15 @@ public interface PaymentPort {
 	 * Charge the consumer, keeping {@code commissionMinor} as the application
 	 * fee and destining the rest for the provider's connected account.
 	 *
-	 * @throws PaymentRefused if the payment was declined — a normal outcome
+	 * <p>May well <em>not</em> have taken any money by the time it returns. Swish
+	 * is a push payment: the customer approves in their bank app and Stripe
+	 * reports the outcome later over a webhook. The returned {@link Charge} says
+	 * which happened, and callers must handle both — treating this as
+	 * synchronous works exactly until the first real payment method is plugged
+	 * in.
+	 *
+	 * @throws PaymentRefused if the payment was declined outright — a normal
+	 *         outcome
 	 * @throws PaymentUnavailable if we do not know whether money moved
 	 */
 	Charge charge(ChargeRequest request);
@@ -32,9 +40,15 @@ public interface PaymentPort {
 	 */
 	Refund refund(String chargeRef, String reason);
 
+	/**
+	 * @param connectedAccountId where the provider's share is sent. Required for
+	 *        a destination charge; without it the whole amount would settle on
+	 *        the platform account with nothing recording whose it is.
+	 */
 	record ChargeRequest(
 		String idempotencyKey,
 		long providerId,
+		String connectedAccountId,
 		int amountMinor,
 		int commissionMinor,
 		String currency,
@@ -42,7 +56,38 @@ public interface PaymentPort {
 		String description
 	) {}
 
-	record Charge(String reference, int amountMinor, String currency) {}
+	/**
+	 * @param reference     the settled charge, or the intent while it is pending
+	 * @param clientSecret  what the browser needs to complete the payment;
+	 *                      null once settled. Safe to hand to the client — it
+	 *                      authorises confirming this one intent and nothing else
+	 */
+	record Charge(
+		String reference,
+		int amountMinor,
+		String currency,
+		Status status,
+		String clientSecret
+	) {
+
+		public static Charge settled(String reference, int amountMinor, String currency) {
+			return new Charge(reference, amountMinor, currency, Status.SETTLED, null);
+		}
+
+		public boolean settled() {
+			return status == Status.SETTLED;
+		}
+	}
+
+	enum Status {
+		/** Money has moved. */
+		SETTLED,
+		/**
+		 * The customer has to do something — approve in Swish, pass 3-D Secure —
+		 * and the outcome arrives later on a webhook.
+		 */
+		REQUIRES_ACTION
+	}
 
 	record Refund(String reference, int amountMinor) {}
 

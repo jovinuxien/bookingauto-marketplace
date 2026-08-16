@@ -133,9 +133,49 @@ class BookingRepository {
 				.addValue("compensating", compensating));
 	}
 
-	void recordCalUid(long attemptId, String uid) {
-		jdbc.update("UPDATE booking_attempt SET cal_booking_uid = :uid WHERE id = :id",
-			new MapSqlParameterSource().addValue("uid", uid).addValue("id", attemptId));
+	/** What Cal said it created, so a webhook-driven resume does not have to guess. */
+	void recordReservation(long attemptId, String uid, Instant end, String status) {
+		jdbc.update("""
+			UPDATE booking_attempt
+			   SET cal_booking_uid = :uid, reserved_end = :end, reserved_status = :status
+			 WHERE id = :id
+			""",
+			new MapSqlParameterSource()
+				.addValue("uid", uid)
+				.addValue("end", java.sql.Timestamp.from(end))
+				.addValue("status", status)
+				.addValue("id", attemptId));
+	}
+
+	void recordPaymentIntent(long attemptId, String intentId) {
+		jdbc.update("UPDATE booking_attempt SET payment_intent_id = :pi WHERE id = :id",
+			new MapSqlParameterSource().addValue("pi", intentId).addValue("id", attemptId));
+	}
+
+	Optional<Attempt> findByPaymentIntent(String intentId) {
+		return jdbc.query("SELECT * FROM booking_attempt WHERE payment_intent_id = :pi",
+			new MapSqlParameterSource("pi", intentId), ATTEMPT).stream().findFirst();
+	}
+
+	/**
+	 * Attempts that have been waiting for the customer too long.
+	 *
+	 * <p>Every one of these is holding a real slot for someone who is not coming
+	 * back. Abandoning a checkout is the common case, not an edge case, so this
+	 * is a load-bearing query rather than a tidy-up.
+	 */
+	List<Attempt> findAbandoned(int olderThanSeconds, int limit) {
+		return jdbc.query("""
+			SELECT * FROM booking_attempt
+			 WHERE state = 'AWAITING_PAYMENT'
+			   AND updated_at < now() - make_interval(secs => :age)
+			 ORDER BY updated_at
+			 LIMIT :limit
+			""",
+			new MapSqlParameterSource()
+				.addValue("age", olderThanSeconds)
+				.addValue("limit", limit),
+			ATTEMPT);
 	}
 
 	void recordPayment(long attemptId, String reference) {
@@ -207,7 +247,9 @@ class BookingRepository {
 	Optional<ServiceForSale> findServiceForSale(long serviceId) {
 		return jdbc.query("""
 			SELECT s.id, s.provider_id, s.cal_event_type_id, s.price_minor,
-			       s.currency, s.duration_minutes, s.active, p.status AS provider_status
+			       s.currency, s.duration_minutes, s.active,
+			       p.status AS provider_status,
+			       p.stripe_account_id, p.payouts_enabled
 			  FROM service s JOIN provider p ON p.id = s.provider_id
 			 WHERE s.id = :id
 			""",
@@ -220,7 +262,9 @@ class BookingRepository {
 				rs.getString("currency"),
 				rs.getInt("duration_minutes"),
 				rs.getBoolean("active"),
-				"active".equals(rs.getString("provider_status")))).stream().findFirst();
+				"active".equals(rs.getString("provider_status")),
+				rs.getString("stripe_account_id"),
+				rs.getBoolean("payouts_enabled"))).stream().findFirst();
 	}
 
 	/**
@@ -262,7 +306,9 @@ class BookingRepository {
 		String currency,
 		int durationMinutes,
 		boolean active,
-		boolean providerActive
+		boolean providerActive,
+		String stripeAccountId,
+		boolean payoutsEnabled
 	) {}
 
 	private static String truncate(String s) {
@@ -284,7 +330,9 @@ class BookingRepository {
 		rs.getString("cal_booking_uid"),
 		rs.getString("payment_ref"),
 		(Long) rs.getObject("booking_id"),
-		rs.getString("failure"));
+		rs.getString("failure"),
+		rs.getTimestamp("reserved_end") == null ? null : rs.getTimestamp("reserved_end").toInstant(),
+		rs.getString("reserved_status"));
 
 	record Attempt(
 		long id,
@@ -301,12 +349,20 @@ class BookingRepository {
 		String calBookingUid,
 		String paymentRef,
 		Long bookingId,
-		String failure
+		String failure,
+		Instant reservedEnd,
+		String reservedStatus
 	) {
 		Attempt withState(AttemptState next) {
 			return new Attempt(id, idempotencyKey, providerId, serviceId, slotStart,
 				priceMinor, commissionMinor, currency, customerEmail, customerName,
-				next, calBookingUid, paymentRef, bookingId, failure);
+				next, calBookingUid, paymentRef, bookingId, failure,
+				reservedEnd, reservedStatus);
+		}
+
+		/** Mirrors {@code CalBookingPort.Reservation.awaitingConfirmation()}. */
+		boolean awaitingConfirmation() {
+			return "pending".equalsIgnoreCase(reservedStatus);
 		}
 	}
 

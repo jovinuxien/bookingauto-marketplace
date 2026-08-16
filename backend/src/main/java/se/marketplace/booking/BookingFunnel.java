@@ -142,7 +142,8 @@ public class BookingFunnel {
 			return new Outcome(attempt.id(), AttemptState.NEEDS_ATTENTION, null, e.getMessage());
 		}
 
-		repository.recordCalUid(attempt.id(), reservation.uid());
+		repository.recordReservation(attempt.id(), reservation.uid(),
+			reservation.end(), reservation.status());
 		repository.transition(attempt, AttemptState.RESERVED, "cal", "ok",
 			"uid=" + reservation.uid() + " status=" + reservation.status(), false);
 		attempt = attempt.withState(AttemptState.RESERVED);
@@ -167,6 +168,7 @@ public class BookingFunnel {
 			charge = payments.charge(new PaymentPort.ChargeRequest(
 				attempt.idempotencyKey(),
 				attempt.providerId(),
+				service.stripeAccountId(),
 				attempt.priceMinor(),
 				attempt.commissionMinor(),
 				attempt.currency(),
@@ -185,6 +187,18 @@ public class BookingFunnel {
 			repository.transition(attempt, AttemptState.NEEDS_ATTENTION, "stripe", "error",
 				"charge outcome unknown: " + e.getMessage(), false);
 			return new Outcome(attempt.id(), AttemptState.NEEDS_ATTENTION, reservation.uid(), e.getMessage());
+		}
+
+		// The customer may still have to approve this in their bank app. If so
+		// the saga stops here and resumes on a webhook — see StripeWebhookController.
+		// Returning "sold" now would be a lie that a Swish user discovers at the
+		// salon door.
+		if (!charge.settled()) {
+			repository.recordPaymentIntent(attempt.id(), charge.reference());
+			repository.transition(attempt, AttemptState.AWAITING_PAYMENT, "stripe", "ok",
+				"awaiting customer action on " + charge.reference(), false);
+			return new Outcome(attempt.id(), AttemptState.AWAITING_PAYMENT,
+				reservation.uid(), null, charge.clientSecret());
 		}
 
 		repository.recordPayment(attempt.id(), charge.reference());
@@ -222,6 +236,83 @@ public class BookingFunnel {
 			bookingId, attempt.providerId(), attempt.serviceId(), reservation.start()));
 
 		return new Outcome(attempt.id(), AttemptState.CONFIRMED, reservation.uid(), null);
+	}
+
+	// ------------------------------------------------------------- resuming --
+
+	/**
+	 * The customer approved the payment. Finishes the saga.
+	 *
+	 * <p>Called from a webhook, in a different request from the one that started
+	 * this attempt and possibly on a different instance. Idempotent on purpose:
+	 * Stripe redelivers on any non-2xx and reorders freely, so "I have already
+	 * seen this" has to be a normal answer rather than an error.
+	 */
+	public Outcome paymentSucceeded(String paymentIntentId, String chargeReference) {
+		Attempt attempt = repository.findByPaymentIntent(paymentIntentId).orElse(null);
+
+		if (attempt == null) {
+			// Not ours, or ours and already garbage collected. Either way there
+			// is nothing to do and nothing wrong.
+			log.info("no attempt for payment intent {}", paymentIntentId);
+			return null;
+		}
+
+		if (attempt.state() != AttemptState.AWAITING_PAYMENT) {
+			log.info("attempt {} already in {}, ignoring duplicate success for {}",
+				attempt.id(), attempt.state(), paymentIntentId);
+			return outcomeOf(attempt);
+		}
+
+		repository.recordPayment(attempt.id(), chargeReference);
+		repository.transition(attempt, AttemptState.CHARGED, "stripe", "ok",
+			"charge=" + chargeReference, false);
+		attempt = attempt.withState(AttemptState.CHARGED);
+
+		if (attempt.awaitingConfirmation()) {
+			try {
+				cal.confirm(attempt.calBookingUid());
+			}
+			catch (RuntimeException e) {
+				return refundAndStop(attempt, chargeReference, attempt.calBookingUid(), e.getMessage());
+			}
+		}
+
+		long bookingId = repository.createBooking(attempt, attempt.calBookingUid(),
+			attempt.slotStart(), attempt.reservedEnd());
+		repository.transition(attempt, AttemptState.CONFIRMED, "cal", "ok",
+			"booking=" + bookingId, false);
+
+		events.publishEvent(new BookingConfirmed(
+			bookingId, attempt.providerId(), attempt.serviceId(), attempt.slotStart()));
+
+		return new Outcome(attempt.id(), AttemptState.CONFIRMED, attempt.calBookingUid(), null);
+	}
+
+	/**
+	 * The payment failed or the customer walked away. Releases the slot.
+	 *
+	 * <p>Also the path the sweeper uses for a checkout nobody ever finished,
+	 * which is the common case rather than the exceptional one.
+	 */
+	public Outcome paymentFailed(String paymentIntentId, String reason) {
+		Attempt attempt = repository.findByPaymentIntent(paymentIntentId).orElse(null);
+
+		if (attempt == null || attempt.state() != AttemptState.AWAITING_PAYMENT) {
+			return attempt == null ? null : outcomeOf(attempt);
+		}
+
+		return releaseAbandoned(attempt, reason);
+	}
+
+	/** Shared by the failure webhook and the sweeper. */
+	Outcome releaseAbandoned(Attempt attempt, String reason) {
+		boolean released = releaseQuietly(attempt, attempt.calBookingUid(), reason);
+
+		AttemptState end = released ? AttemptState.CHARGE_FAILED : AttemptState.NEEDS_ATTENTION;
+		repository.transition(attempt, end, "stripe", released ? "refused" : "error", reason, false);
+
+		return new Outcome(attempt.id(), end, attempt.calBookingUid(), reason);
 	}
 
 	/**
@@ -326,10 +417,29 @@ public class BookingFunnel {
 		String customerEmail
 	) {}
 
-	public record Outcome(long attemptId, AttemptState state, String calBookingUid, String failure) {
+	/**
+	 * @param clientSecret present only while the customer still has to approve
+	 *        the payment. Safe to return: it authorises confirming this one
+	 *        intent and nothing else.
+	 */
+	public record Outcome(
+		long attemptId,
+		AttemptState state,
+		String calBookingUid,
+		String failure,
+		String clientSecret
+	) {
+
+		public Outcome(long attemptId, AttemptState state, String calBookingUid, String failure) {
+			this(attemptId, state, calBookingUid, failure, null);
+		}
 
 		public boolean sold() {
 			return state == AttemptState.CONFIRMED;
+		}
+
+		public boolean awaitingPayment() {
+			return state == AttemptState.AWAITING_PAYMENT;
 		}
 
 		public boolean needsAttention() {

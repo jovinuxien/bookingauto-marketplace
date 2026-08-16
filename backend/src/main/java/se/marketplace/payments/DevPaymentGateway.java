@@ -40,6 +40,16 @@ class DevPaymentGateway implements PaymentPort {
 	@Value("${marketplace.payments.break-refunds:false}")
 	private boolean breakRefunds;
 
+	/**
+	 * Exercises the asynchronous path without Stripe.
+	 *
+	 * <p>Worth having even though it is a fiction: a gateway that always settles
+	 * inline lets the whole AWAITING_PAYMENT branch rot untested until the day
+	 * real Swish traffic arrives.
+	 */
+	@Value("${marketplace.payments.pending-email:pending@example.se}")
+	private String pendingEmail;
+
 	DevPaymentGateway() {
 		log.warn("dev payment gateway active — no money will move");
 	}
@@ -55,11 +65,17 @@ class DevPaymentGateway implements PaymentPort {
 
 		String ref = "dev_ch_" + sequence.incrementAndGet();
 
+		if (pendingEmail.equalsIgnoreCase(request.customerEmail())) {
+			log.info("dev charge {} left awaiting customer action", ref);
+			return new Charge(ref, request.amountMinor(), request.currency(),
+				Status.REQUIRES_ACTION, "dev_secret_" + ref);
+		}
+
 		log.info("dev charge {} of {} {} for provider {} (commission {})",
 			ref, request.amountMinor(), request.currency(),
 			request.providerId(), request.commissionMinor());
 
-		return new Charge(ref, request.amountMinor(), request.currency());
+		return Charge.settled(ref, request.amountMinor(), request.currency());
 	}
 
 	@Override
