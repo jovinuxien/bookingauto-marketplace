@@ -67,6 +67,21 @@ then charge, then confirm. If payment fails or is abandoned, cancel the pending
 booking. The slot is genuinely held by the authority that owns it, and no money
 moves against a slot that was not secured.
 
+> **Amendment — "pending holds the slot" is false by default.** Tested against
+> the Cal version we run: with `requiresConfirmation = true` alone,
+> `POST /api/book/event` returns a booking with status `pending` and the slot
+> **stays on sale** — the day kept all 12 slots and the booked time was still
+> offered. The reserve step would reserve nothing, and we would charge for a
+> slot another customer can still take.
+>
+> `requiresConfirmationWillBlockSlot = true` is also required; with both set the
+> day drops to 11 slots and the booked time disappears. Both default to `false`.
+>
+> This makes reserve-first an **onboarding invariant** rather than a
+> booking-time choice: an event type created without both flags is unsafe to
+> sell and looks completely normal. Enforced in `seed/cal-dev.sql`; must be
+> enforced wherever real onboarding creates event types.
+
 **Charge first with compensation.** ~~Authorise rather than capture, create the
 booking, capture on success, void the authorisation on failure.~~ **Not
 available** — Swish does not support manual capture. Recorded here so nobody

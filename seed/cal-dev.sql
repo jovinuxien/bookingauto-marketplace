@@ -46,13 +46,26 @@ update users u
 -- The bookable thing. 45 minutes to match service.duration_minutes on the
 -- marketplace side; a mismatch there would make the index describe slots
 -- of a length Cal will not sell.
-insert into "EventType" (title, slug, length, "userId", "scheduleId", price, currency)
-select 'Färgning 45 min', 'fargning-45', 45, u.id, u."defaultScheduleId", 0, 'sek'
+insert into "EventType" (title, slug, length, "userId", "scheduleId", price, currency,
+                         "requiresConfirmation", "requiresConfirmationWillBlockSlot")
+select 'Färgning 45 min', 'fargning-45', 45, u.id, u."defaultScheduleId", 0, 'sek', true, true
   from users u
  where u.username in ('salong-sodermalm', 'klinik-vasastan', 'goteborg-harstudio')
    and not exists (
          select 1 from "EventType" e
           where e."userId" = u.id and e.slug = 'fargning-45');
+
+-- Both confirmation flags default to FALSE, and both are required for the
+-- reserve-first payment ordering in ADR 0005 to mean anything. Verified
+-- against this Cal version: with requiresConfirmation alone, a booking is
+-- created "pending" and the slot is STILL OFFERED to everyone else -- so the
+-- "reserve" step reserves nothing and we would charge for a slot another
+-- customer can still take. Adding requiresConfirmationWillBlockSlot drops the
+-- day from 12 offered slots to 11 and removes the booked time.
+update "EventType"
+   set "requiresConfirmation" = true,
+       "requiresConfirmationWillBlockSlot" = true
+ where slug = 'fargning-45';
 
 -- EventType."userId" is only the OWNER. Cal resolves who can actually be
 -- booked through the _user_eventtype join table, and an event type absent
