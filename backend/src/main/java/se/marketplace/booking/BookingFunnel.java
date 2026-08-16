@@ -193,16 +193,25 @@ public class BookingFunnel {
 		attempt = attempt.withState(AttemptState.CHARGED);
 
 		// ---------------------------------------------------------- stage 8 --
-		try {
-			cal.confirm(reservation.uid());
-		}
-		catch (RuntimeException e) {
-			// Money has moved against an appointment that is not confirmed.
-			// There is no void available, so the compensation is a refund.
-			return refundAndStop(attempt, charge.reference(), reservation.uid(), e.getMessage());
+		// Only if there is anything to confirm. An auto-accepting event type
+		// already returned ACCEPTED and is already holding the slot, so calling
+		// confirm would be asking Cal to repeat itself — and it is the one call
+		// in this funnel that needs an authenticated api-v2, which needs a paid
+		// Cal licence. Skipping it when it is redundant is what keeps the
+		// licence off the critical path.
+		if (reservation.awaitingConfirmation()) {
+			try {
+				cal.confirm(reservation.uid());
+			}
+			catch (RuntimeException e) {
+				// Money has moved against an appointment that is not confirmed.
+				// There is no void available, so the compensation is a refund.
+				return refundAndStop(attempt, charge.reference(), reservation.uid(), e.getMessage());
+			}
 		}
 
-		long bookingId = repository.createBooking(attempt, reservation.start(), reservation.end());
+		long bookingId = repository.createBooking(
+			attempt, reservation.uid(), reservation.start(), reservation.end());
 		repository.transition(attempt, AttemptState.CONFIRMED, "cal", "ok",
 			"booking=" + bookingId, false);
 

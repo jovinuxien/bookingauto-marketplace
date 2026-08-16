@@ -92,7 +92,27 @@ public interface CalBookingPort {
 		Instant end,
 		long calEventTypeId,
 		String status
-	) {}
+	) {
+
+		/**
+		 * Whether Cal is waiting for someone to confirm this booking.
+		 *
+		 * <p>Decides whether stage 8 has anything to do, and is read from what
+		 * Cal returned rather than from configuration on our side. An event type
+		 * with {@code requiresConfirmation} yields {@code PENDING} and needs an
+		 * explicit confirm; one without yields {@code ACCEPTED}, already holds
+		 * the slot, and there is nothing left to confirm.
+		 *
+		 * <p>That distinction is load-bearing for more than tidiness: confirming
+		 * is the one operation here that requires an authenticated api-v2 call,
+		 * and authenticated api-v2 requires a paid Cal licence. Reserving and
+		 * cancelling do not. So an auto-accepting event type makes the whole
+		 * funnel work without one.
+		 */
+		public boolean awaitingConfirmation() {
+			return "pending".equalsIgnoreCase(status);
+		}
+	}
 
 	/** Cal declined. The slot was not free. */
 	class CalRefused extends RuntimeException {

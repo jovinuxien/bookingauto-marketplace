@@ -92,6 +92,17 @@ Stage 6 failing is a **normal handled path**, not an exception. It is what
 ADR 0002 buys: search is allowed to be wrong precisely because this step exists
 to catch it.
 
+## Superseded: how the slot is held
+
+The section below documents a real finding, and the approach it describes is no
+longer what we do. Holding a slot with a *pending* booking requires confirming
+it later, and confirming is the one operation that needs an authenticated
+api-v2 call — which needs a paid Cal licence. Auto-accepting event types hold
+the slot just as firmly with nothing to confirm. See **ADR 0008**.
+
+Kept because the flag behaviour is still true, still surprising, and still the
+right answer for a licensed deployment.
+
 ## Verified: reserve-first requires two flags, and both default to false
 
 ADR 0005 chose reserve-first on the assumption that a pending booking holds the
@@ -176,8 +187,15 @@ because an internal API changing shape on a read means a stale index, while on a
 write it means charging for an appointment that does not exist. Pin the Cal
 image version and re-probe every endpoint on upgrade.
 
-**Next step is deployment, not code.** `CalBookingPort` already has `confirm` and
-`cancel`; they throw until `marketplace.cal.api-v2-url` is set, which routes
-affected attempts to `NEEDS_ATTENTION` rather than silently reporting a
-cancellation that never happened. Standing `api-v2` up is a configuration change
-from here.
+**Done.** `api-v2` is built and deployed (`docker/build-api-v2.sh`, service
+`cal-api`), and the funnel runs end to end against it:
+
+| attempt | outcome | effect |
+|---|---|---|
+| complete sale | `CONFIRMED` 201 | booking written, day 12 → 11 slots |
+| same slot again | `REFUSED` 409 | availability miss recorded |
+| declined payment | `CHARGE_FAILED` 402 | **slot released**, still 11 slots |
+
+Cal ends with one `accepted` and one `cancelled` booking, and the released
+attempt's trail carries the compensating step. The one thing still gated is
+`confirm`, and ADR 0008 explains why we no longer need it.

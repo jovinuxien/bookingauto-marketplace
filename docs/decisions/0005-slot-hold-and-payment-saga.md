@@ -79,8 +79,13 @@ moves against a slot that was not secured.
 >
 > This makes reserve-first an **onboarding invariant** rather than a
 > booking-time choice: an event type created without both flags is unsafe to
-> sell and looks completely normal. Enforced in `seed/cal-dev.sql`; must be
-> enforced wherever real onboarding creates event types.
+> sell and looks completely normal.
+>
+> **Superseded by ADR 0008.** Confirming a pending booking needs an
+> authenticated api-v2 call, and that needs a paid Cal licence. We now create
+> auto-accepting event types instead: the booking comes back `ACCEPTED`, already
+> holding the slot, with nothing to confirm. The ordering argument below is
+> unchanged — the slot is still held before money moves — only the mechanism is.
 
 **Charge first with compensation.** ~~Authorise rather than capture, create the
 booking, capture on success, void the authorisation on failure.~~ **Not

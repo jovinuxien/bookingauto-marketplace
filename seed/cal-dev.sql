@@ -48,23 +48,40 @@ update users u
 -- of a length Cal will not sell.
 insert into "EventType" (title, slug, length, "userId", "scheduleId", price, currency,
                          "requiresConfirmation", "requiresConfirmationWillBlockSlot")
-select 'Färgning 45 min', 'fargning-45', 45, u.id, u."defaultScheduleId", 0, 'sek', true, true
+select 'Färgning 45 min', 'fargning-45', 45, u.id, u."defaultScheduleId", 0, 'sek', false, false
   from users u
  where u.username in ('salong-sodermalm', 'klinik-vasastan', 'goteborg-harstudio')
    and not exists (
          select 1 from "EventType" e
           where e."userId" = u.id and e.slug = 'fargning-45');
 
--- Both confirmation flags default to FALSE, and both are required for the
--- reserve-first payment ordering in ADR 0005 to mean anything. Verified
--- against this Cal version: with requiresConfirmation alone, a booking is
--- created "pending" and the slot is STILL OFFERED to everyone else -- so the
--- "reserve" step reserves nothing and we would charge for a slot another
--- customer can still take. Adding requiresConfirmationWillBlockSlot drops the
--- day from 12 offered slots to 11 and removes the booked time.
+-- Auto-accepting on purpose. Both confirmation flags are OFF, and that is a
+-- decision worth understanding before flipping it.
+--
+-- Reserve-first needs the reservation to actually hold the slot. There are two
+-- ways to get that, both verified against this Cal version:
+--
+--   requiresConfirmation + requiresConfirmationWillBlockSlot
+--       booking is created PENDING and holds the slot (12 slots -> 11).
+--       Completing the sale then needs an authenticated api-v2 confirm, and
+--       authenticated api-v2 needs a PAID Cal licence -- the api key strategy
+--       checks CALCOM_LICENSE_KEY before it even looks at the key.
+--       NB requiresConfirmation ALONE holds nothing: the booking is PENDING
+--       and the slot stays on sale, which is the worst of both.
+--
+--   neither flag (what we do)
+--       booking is created ACCEPTED and holds the slot immediately
+--       (12 slots -> 10 for a 45 minute service). Nothing to confirm, so no
+--       licence is needed. Cancelling is unauthenticated on api-v2, so the
+--       compensation still works.
+--
+-- The cost of auto-accepting is that Cal emails the customer a confirmation
+-- before payment has succeeded, and a cancellation if it then fails. That is a
+-- Cal workflow setting to tune, not an architectural problem -- whereas the
+-- licence is neither.
 update "EventType"
-   set "requiresConfirmation" = true,
-       "requiresConfirmationWillBlockSlot" = true
+   set "requiresConfirmation" = false,
+       "requiresConfirmationWillBlockSlot" = false
  where slug = 'fargning-45';
 
 -- EventType."userId" is only the OWNER. Cal resolves who can actually be

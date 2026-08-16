@@ -181,6 +181,33 @@ class BookingFunnelTest {
 		assertThat(cal.cancelled).containsExactly("cal-uid-1");
 	}
 
+	// ---------------------------------------------- confirmation is optional --
+
+	@Test
+	@DisplayName("an already-accepted reservation is not confirmed again")
+	void acceptedReservationSkipsConfirm() {
+		cal.status = "ACCEPTED";
+
+		BookingFunnel.Outcome outcome = book();
+
+		assertThat(outcome.sold()).isTrue();
+		// Confirming is the one call that needs an authenticated api-v2, which
+		// needs a paid Cal licence. An auto-accepting event type already holds
+		// the slot, so making this call would buy nothing and cost that.
+		assertThat(cal.confirmed).isEmpty();
+	}
+
+	@Test
+	@DisplayName("a pending reservation must still be confirmed")
+	void pendingReservationIsConfirmed() {
+		cal.status = "PENDING";
+
+		BookingFunnel.Outcome outcome = book();
+
+		assertThat(outcome.sold()).isTrue();
+		assertThat(cal.confirmed).containsExactly("cal-uid-1");
+	}
+
 	// ------------------------------------------------------ stage 8 failures --
 
 	@Test
@@ -312,7 +339,14 @@ class BookingFunnelTest {
 		}
 
 		@Override
-		long createBooking(Attempt attempt, Instant startsAt, Instant endsAt) {
+		long createBooking(Attempt attempt, String calBookingUid, Instant startsAt, Instant endsAt) {
+			// Asserted, not ignored. The first version of this fake accepted
+			// anything and so missed a null uid that the real NOT NULL
+			// constraint rejected at runtime. A fake laxer than the schema tests
+			// nothing.
+			if (calBookingUid == null || calBookingUid.isBlank()) {
+				throw new IllegalStateException("booking created without a cal uid");
+			}
 			return 99L;
 		}
 
@@ -352,11 +386,14 @@ class BookingFunnelTest {
 				startsAt.plus(Duration.ofMinutes(45)), 1L, status);
 		}
 
+		final List<String> confirmed = new ArrayList<>();
+
 		@Override
 		public void confirm(String calBookingUid) {
 			if (confirmFails) {
 				throw new CalUnavailable("api-v2 not deployed");
 			}
+			confirmed.add(calBookingUid);
 		}
 
 		@Override

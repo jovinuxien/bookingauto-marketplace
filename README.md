@@ -58,22 +58,27 @@ API without anything hand-written in between:
   Bad and missing signatures are rejected 401 and still recorded
 - Both databases up, PostGIS 3.4 working, Cal.diy healthy and migrated
 
-- **The booking funnel runs**, with its state machine, trail and compensations.
-  A live checkout reserved a real slot in Cal, verified the read-back, charged,
-  failed to confirm, refunded, failed to release, and ended `NEEDS_ATTENTION` —
-  each step written to `booking_attempt_step`. A second checkout for that slot
-  was then refused by Cal and recorded as the first `availability_miss`
-- 25 tests, covering every compensation path including the ones that only run
+- **The booking funnel sells.** Against a real Cal with `api-v2` deployed:
+
+  | attempt | outcome | effect |
+  |---|---|---|
+  | complete sale | `CONFIRMED` 201 | booking written, day 12 → 11 slots |
+  | same slot again | `REFUSED` 409 | availability miss recorded |
+  | declined payment | `CHARGE_FAILED` 402 | **slot released**, still 11 slots |
+
+  Cal ends with one `accepted` booking and one `cancelled`, and the released
+  attempt's trail carries its compensating step
+- 27 tests, covering every compensation path including the ones that only run
   after a compensation itself fails
 
 Sketch:
 
-- **Cal's `api-v2` is not deployed, and the funnel needs it.** Reserving is
-  public; confirming and cancelling are not. See the design note — this is a
-  deployment step, not a code one
 - Payments run through a dev gateway that moves no money; Stripe Connect is not
   wired
 - Provider onboarding and the frontend do not exist yet
+- **Confirming a booking needs a paid Cal licence**, so we create auto-accepting
+  event types and never need to. See ADR 0008 — this is the constraint most
+  likely to shape what comes next
 
 ```bash
 ./seed/cal-dev.sh                              # supply, both sides

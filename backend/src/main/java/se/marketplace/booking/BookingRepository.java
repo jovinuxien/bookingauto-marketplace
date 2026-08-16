@@ -143,8 +143,16 @@ class BookingRepository {
 			new MapSqlParameterSource().addValue("ref", reference).addValue("id", attemptId));
 	}
 
-	/** The commercial record, written only once the sale actually happened. */
-	long createBooking(Attempt attempt, Instant startsAt, Instant endsAt) {
+	/**
+	 * The commercial record, written only once the sale actually happened.
+	 *
+	 * <p>The Cal uid is passed in rather than read off {@code attempt}. It has to
+	 * be: {@link #recordCalUid} writes it to the database, not to the caller's
+	 * in-memory copy, so the attempt object still carries null at this point. A
+	 * NOT NULL constraint caught it here, which is the good outcome — but the
+	 * argument is what stops it recurring.
+	 */
+	long createBooking(Attempt attempt, String calBookingUid, Instant startsAt, Instant endsAt) {
 		var keys = new GeneratedKeyHolder();
 
 		jdbc.update("""
@@ -158,7 +166,7 @@ class BookingRepository {
 			new MapSqlParameterSource()
 				.addValue("providerId", attempt.providerId())
 				.addValue("serviceId", attempt.serviceId())
-				.addValue("uid", attempt.calBookingUid())
+				.addValue("uid", calBookingUid)
 				.addValue("startsAt", java.sql.Timestamp.from(startsAt))
 				.addValue("endsAt", java.sql.Timestamp.from(endsAt))
 				.addValue("email", attempt.customerEmail())
@@ -223,15 +231,26 @@ class BookingRepository {
 	 * more interesting than lag.
 	 */
 	Integer indexAgeSeconds(long serviceId, Instant slotStart) {
+		// The CASE is required, not defensive. markStale writes
+		// computed_at = '-infinity' as its sentinel, and subtracting an infinite
+		// timestamp is a hard error in Postgres — so recording a miss against a
+		// service that had just been marked stale failed the whole request. NULL
+		// is also the honest answer: the row was explicitly invalidated, so it
+		// has no meaningful age.
 		List<Integer> ages = jdbc.query("""
-			SELECT EXTRACT(EPOCH FROM (now() - computed_at))::int AS age
+			SELECT CASE WHEN computed_at = TIMESTAMPTZ '-infinity' THEN NULL
+			            ELSE EXTRACT(EPOCH FROM (now() - computed_at))::int
+			       END AS age
 			  FROM availability_day
 			 WHERE service_id = :id AND day = (:slot AT TIME ZONE 'Europe/Stockholm')::date
 			""",
 			new MapSqlParameterSource()
 				.addValue("id", serviceId)
 				.addValue("slot", java.sql.Timestamp.from(slotStart)),
-			(ResultSet rs, int n) -> rs.getInt("age"));
+			(ResultSet rs, int n) -> {
+				int age = rs.getInt("age");
+				return rs.wasNull() ? null : age;
+			});
 		return ages.isEmpty() ? null : ages.get(0);
 	}
 

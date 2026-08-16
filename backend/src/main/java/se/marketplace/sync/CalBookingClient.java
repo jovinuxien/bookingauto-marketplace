@@ -132,6 +132,26 @@ class CalBookingClient implements CalBookingPort {
 		}
 	}
 
+	/**
+	 * Cancels, deliberately <strong>without</strong> an Authorization header.
+	 *
+	 * <p>This looks like an omission and is the opposite. Cal guards cancel with
+	 * {@code OptionalApiAuthGuard}: no credentials at all is accepted and
+	 * performs the attendee-style cancellation, which is exactly what we want
+	 * for a booking we created on the customer's behalf. But a token that
+	 * <em>is</em> supplied gets validated — and validating an api key begins
+	 * with a {@code CALCOM_LICENSE_KEY} check, before it even looks at the key.
+	 *
+	 * <p>So on an unlicensed deployment, sending our key turns a working call
+	 * into a 401. Measured, not guessed: the identical request cancels the
+	 * booking with the header removed. Sending credentials is strictly worse
+	 * than sending none, which is not a sentence anyone expects to write, and is
+	 * why this method does not take the shortcut of reusing the confirm setup.
+	 *
+	 * <p>The trade-off is that we cancel as the attendee rather than as the
+	 * host. For releasing a reservation whose sale failed, that is the correct
+	 * role anyway.
+	 */
 	@Override
 	public void cancel(String calBookingUid, String reason) {
 		requireApiV2("cancel");
@@ -139,7 +159,6 @@ class CalBookingClient implements CalBookingPort {
 		try {
 			http.post()
 				.uri(apiV2Url + "/v2/bookings/" + calBookingUid + "/cancel")
-				.header("Authorization", "Bearer " + apiKey)
 				.header("cal-api-version", API_VERSION)
 				.header("Content-Type", "application/json")
 				.body("{\"cancellationReason\":" + quote(reason) + "}")
