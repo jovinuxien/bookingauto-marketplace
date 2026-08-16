@@ -7,13 +7,15 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import App from 'app/app';
 import store from 'app/config/store';
 import setupAxiosInterceptors from 'app/config/axios-interceptor';
+import { sessionCleared } from 'app/shared/reducers/auth.reducer';
 import ErrorBoundary from 'app/shared/error/error-boundary';
 
 // Wired before the first render so no request can escape the error handling.
+// A 401 anywhere means the server has stopped accepting the session, and the
+// store has to agree with that immediately -- otherwise the console keeps
+// rendering a logged-in shell over requests that are all failing.
 setupAxiosInterceptors(() => {
-  // Nothing to clear yet: the consumer journey is anonymous until checkout.
-  // Left explicit rather than omitted, because this is where session handling
-  // will hang when accounts exist.
+  store.dispatch(sessionCleared());
 });
 
 const container = document.getElementById('root');

@@ -32,6 +32,8 @@ class WebConfig implements WebMvcConfigurer {
 		registry.addViewController("/sok").setViewName("forward:/index.html");
 		registry.addViewController("/salong/{slug}").setViewName("forward:/index.html");
 		registry.addViewController("/boka/{serviceId}").setViewName("forward:/index.html");
+		registry.addViewController("/logga-in").setViewName("forward:/index.html");
+		registry.addViewController("/konsol").setViewName("forward:/index.html");
 	}
 
 }

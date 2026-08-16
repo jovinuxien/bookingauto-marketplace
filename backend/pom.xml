@@ -41,6 +41,14 @@
       <artifactId>spring-boot-starter-jdbc</artifactId>
     </dependency>
 
+    <!-- The console is the first surface with a person behind it. Adding this
+         makes everything deny-by-default, which is the right posture and means
+         the public endpoints now have to be listed on purpose. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>

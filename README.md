@@ -92,6 +92,12 @@ API without anything hand-written in between:
   `target/classes/static` and served from the same jar, so there is one artefact
   and one origin. Search → salon → real times from Cal → checkout, with each
   funnel outcome given its own screen
+- **The business console exists**, and with it the system's first authentication.
+  A platform admin creates a salon login; the salon sees whether it is sellable,
+  what it has earned, what the platform kept, its upcoming bookings, and
+  anything stuck in `NEEDS_ATTENTION`. Verified: a salon cannot mint logins (403)
+  and every console query is scoped to the session's provider, never to an id
+  from the caller
 - 34 tests
 
 Sketch:
@@ -193,8 +199,8 @@ In the order worth doing it:
    amendment to ADR 0004; the fix is narrow and does not touch the journey.
 2. A Stripe test account, to verify the half that `stripe-mock` cannot: real
    Swish redirection, webhook signatures, Connect onboarding, payouts.
-3. The business console, for salons. Same layout as the consumer SPA, and the
-   one place this architecture costs nothing at all.
+3. Self-serve salon signup. Onboarding is an operator action today, because
+   opening it needs email verification and rate limiting first.
 
 Done: the availability reconciler, the booking funnel with its compensations,
 Stripe Connect with the asynchronous payment path, and provider onboarding.
@@ -225,3 +231,23 @@ mvn -Dskip.npm=false package   # or let Maven do it
 ```
 
 Backend-only builds pass `-Dskip.npm=true`, which is the default.
+
+## The security model
+
+Adding Spring Security made everything deny-by-default, so the public surface is
+now listed on purpose in `console/SecurityConfig`. Four categories:
+
+| | |
+|---|---|
+| the SPA and the consumer journey | anonymous — requiring an account to see availability would cost more bookings than it could protect |
+| `/internal/**` | verified by signature, not by session |
+| `/api/console/**` | authenticated, scoped to the session's provider |
+| `POST /api/providers` | platform admin only |
+
+Sessions rather than tokens: the SPA ships in the same jar, so the cookie is
+first-party and `HttpOnly` and no script can read it. CSRF protection is
+therefore real and stays on — disabled only where a cookie plays no part.
+
+Bootstrap the first operator with
+`MARKETPLACE_CONSOLE_BOOTSTRAP_ADMIN_EMAIL` / `..._PASSWORD`. It runs once,
+does nothing if an admin exists, and logs a warning telling you to remove it.

@@ -5,6 +5,9 @@ import Home from 'app/modules/home/home';
 import SearchResults from 'app/modules/search/search-results';
 import ProviderPage from 'app/modules/provider/provider-page';
 import Checkout from 'app/modules/booking/checkout';
+import Login from 'app/modules/login/login';
+import Console from 'app/modules/console/console';
+import PrivateRoute from 'app/shared/auth/private-route';
 import NotFound from 'app/shared/error/not-found';
 
 /**
@@ -20,6 +23,10 @@ const AppRoutes = () => (
     <Route path="/sok" element={<SearchResults />} />
     <Route path="/salong/:slug" element={<ProviderPage />} />
     <Route path="/boka/:serviceId" element={<Checkout />} />
+
+    {/* The business side. Guarded here for rendering; enforced on the server. */}
+    <Route path="/logga-in" element={<Login />} />
+    <Route path="/konsol" element={<PrivateRoute><Console /></PrivateRoute>} />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );
