@@ -81,11 +81,21 @@ API without anything hand-written in between:
   returned 11 → 12, with no webhook involved
 - 33 tests
 
+- **Provider onboarding works.** A new salon was created (Cal user + Stripe
+  connected account), built a service in Cal's UI, had it imported — with an
+  unsafe event type skipped and the reason returned — activated on KYC, was
+  indexed by the reconciler in ~5s, and appeared **first in search at 361 m**
+- Module boundaries are verified by a test. It caught a real cycle the moment it
+  was added
+- 34 tests
+
 Sketch:
 
 - Stripe is exercised only against `stripe-mock`, which validates request shape
   and nothing else. Real Swish redirection, webhook signatures, Connect
   onboarding and payouts need a Stripe test account
+- Provider onboarding leaves the salon with two logins, ours and Cal's — the
+  cost of not having a Cal licence. See ADR 0010
 - Provider onboarding and the frontend do not exist yet
 - **Confirming a booking needs a paid Cal licence**, so we create auto-accepting
   event types and never need to. See ADR 0008 — this is the constraint most
@@ -106,7 +116,7 @@ docker/                build-api-v2.sh — no published image exists
 seed/                  dev fixtures — cal-dev.sh seeds both sides
 docs/decisions/        ADRs — why, not what
 docs/design/           booking-funnel.md — the saga, stage by stage
-backend/               Spring Modulith: search, sync, booking, payments
+backend/               Spring Modulith: search, sync, booking, payments, onboarding
 ```
 
 ## Cal's api-v2
@@ -172,15 +182,15 @@ geo support at all, and geo is this product's primary filter.
 
 In the order worth doing it:
 
-1. The booking funnel, with the confirm-against-Cal step made explicit. This
-   is the first write against Cal, and it is where ADR 0007 has to be answered
-   again — a write may justify building `api-v2` even though reads did not.
-2. Provider onboarding — Team + staff + services + Stripe KYC in one flow,
-   replacing `seed/cal-dev.sql`, which writes Cal's schema directly and is a
-   dev shortcut rather than a mechanism.
-3. Payments.
+1. The frontends. Everything below the API exists; nothing above it does, and a
+   marketplace with no consumer site is not testable by anyone but us.
+2. A Stripe test account, to verify the half that `stripe-mock` cannot: real
+   Swish redirection, webhook signatures, Connect onboarding, payouts.
+3. Notifications — the salon currently learns about a booking only from Cal's
+   own email.
 
-Done: the reconciler in `backend/.../sync`, with tests.
+Done: the availability reconciler, the booking funnel with its compensations,
+Stripe Connect with the asynchronous payment path, and provider onboarding.
 
 ## Known shape problems, recorded early
 

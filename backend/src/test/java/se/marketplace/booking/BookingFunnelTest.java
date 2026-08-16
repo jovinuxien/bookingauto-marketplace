@@ -38,7 +38,7 @@ class BookingFunnelTest {
 	private FakeCal cal;
 	private FakePayments payments;
 	private RecordingRepository repository;
-	private List<Object> published;
+	private List<Long> refreshed;
 	private BookingFunnel funnel;
 
 	@BeforeEach
@@ -46,9 +46,9 @@ class BookingFunnelTest {
 		cal = new FakeCal();
 		payments = new FakePayments();
 		repository = new RecordingRepository();
-		published = new ArrayList<>();
+		refreshed = new ArrayList<>();
 
-		funnel = new BookingFunnel(repository, cal, payments, event -> published.add(event));
+		funnel = new BookingFunnel(repository, cal, payments, serviceId -> refreshed.add(serviceId));
 		ReflectionTestUtils.setField(funnel, "commissionBps", 1500);
 		ReflectionTestUtils.setField(funnel, "timeZone", "Europe/Stockholm");
 	}
@@ -85,11 +85,12 @@ class BookingFunnelTest {
 	}
 
 	@Test
-	@DisplayName("a completed sale announces itself so the index can be refreshed")
-	void publishesConfirmation() {
+	@DisplayName("a completed sale marks the index stale immediately")
+	void marksIndexStale() {
 		book();
-		assertThat(published).hasSize(1);
-		assertThat(published.get(0)).isInstanceOf(BookingFunnel.BookingConfirmed.class);
+		// Not left to Cal's webhook: the slot we just sold would stay advertised
+		// for as long as delivery takes, and webhooks are missed.
+		assertThat(refreshed).containsExactly(1L);
 	}
 
 	// ------------------------------------------------------- stage 6 refusal --
@@ -274,7 +275,7 @@ class BookingFunnelTest {
 		BookingFunnel.Outcome outcome = funnel.paymentSucceeded("pi_1", "ch_live_1");
 
 		assertThat(outcome.sold()).isTrue();
-		assertThat(published).hasSize(1);
+		assertThat(refreshed).containsExactly(1L);
 	}
 
 	@Test
@@ -289,7 +290,7 @@ class BookingFunnelTest {
 		// Stripe redelivers on any non-2xx and reorders freely, so this has to be
 		// a normal answer rather than a second booking.
 		assertThat(again.state()).isEqualTo(AttemptState.CONFIRMED);
-		assertThat(published).hasSize(1);
+		assertThat(refreshed).containsExactly(1L);
 	}
 
 	@Test

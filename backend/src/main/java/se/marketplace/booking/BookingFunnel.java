@@ -7,13 +7,13 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import se.marketplace.booking.BookingRepository.Attempt;
 import se.marketplace.booking.BookingRepository.NewAttempt;
 import se.marketplace.booking.BookingRepository.ServiceForSale;
 import se.marketplace.payments.PaymentPort;
+import se.marketplace.sync.AvailabilityRefreshPort;
 import se.marketplace.sync.CalBookingPort;
 
 /**
@@ -52,7 +52,7 @@ public class BookingFunnel {
 	private final BookingRepository repository;
 	private final CalBookingPort cal;
 	private final PaymentPort payments;
-	private final ApplicationEventPublisher events;
+	private final AvailabilityRefreshPort availability;
 
 	/** Basis points. 1500 = 15%. Frozen onto the attempt at stage 5. */
 	@Value("${marketplace.commission-bps:1500}")
@@ -62,11 +62,11 @@ public class BookingFunnel {
 	private String timeZone;
 
 	BookingFunnel(BookingRepository repository, CalBookingPort cal,
-		PaymentPort payments, ApplicationEventPublisher events) {
+		PaymentPort payments, AvailabilityRefreshPort availability) {
 		this.repository = repository;
 		this.cal = cal;
 		this.payments = payments;
-		this.events = events;
+		this.availability = availability;
 	}
 
 	/**
@@ -232,8 +232,7 @@ public class BookingFunnel {
 		// The index is now certainly wrong for this service; say so rather than
 		// waiting for Cal's webhook, which is a latency optimisation and not a
 		// guarantee.
-		events.publishEvent(new BookingConfirmed(
-			bookingId, attempt.providerId(), attempt.serviceId(), reservation.start()));
+		availability.markStale(attempt.serviceId());
 
 		return new Outcome(attempt.id(), AttemptState.CONFIRMED, reservation.uid(), null);
 	}
@@ -283,8 +282,7 @@ public class BookingFunnel {
 		repository.transition(attempt, AttemptState.CONFIRMED, "cal", "ok",
 			"booking=" + bookingId, false);
 
-		events.publishEvent(new BookingConfirmed(
-			bookingId, attempt.providerId(), attempt.serviceId(), attempt.slotStart()));
+		availability.markStale(attempt.serviceId());
 
 		return new Outcome(attempt.id(), AttemptState.CONFIRMED, attempt.calBookingUid(), null);
 	}
@@ -446,8 +444,5 @@ public class BookingFunnel {
 			return state == AttemptState.NEEDS_ATTENTION;
 		}
 	}
-
-	/** Published when a sale completes. Consumed by sync to refresh the index. */
-	public record BookingConfirmed(long bookingId, long providerId, long serviceId, Instant startsAt) {}
 
 }

@@ -1,4 +1,4 @@
-package se.marketplace.booking;
+package se.marketplace.payments;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,11 +15,19 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.context.ApplicationEventPublisher;
+
 import com.stripe.exception.SignatureVerificationException;
 import com.stripe.net.Webhook;
 
 /**
  * Where a suspended sale gets finished.
+ *
+ * <p>Lives in {@code payments} because this module owns Stripe's wire shape, the
+ * same way {@code sync} owns Cal's. Nothing outside here parses a Stripe
+ * payload; what leaves is a handful of events in our own vocabulary, which is
+ * what lets a booking saga and a provider's KYC both react to the one endpoint
+ * Stripe is willing to deliver to without either knowing about the other.
  *
  * <p>The funnel stops at {@code AWAITING_PAYMENT} because Swish is a push
  * payment and the customer is off in their bank app. This is the other half of
@@ -46,15 +54,15 @@ class StripeWebhookController {
 
 	private static final Logger log = LoggerFactory.getLogger(StripeWebhookController.class);
 
-	private final BookingFunnel funnel;
+	private final ApplicationEventPublisher events;
 	private final NamedParameterJdbcTemplate jdbc;
 	private final ObjectMapper mapper = new ObjectMapper();
 
 	@Value("${marketplace.payments.stripe.webhook-secret:}")
 	private String secret;
 
-	StripeWebhookController(BookingFunnel funnel, NamedParameterJdbcTemplate jdbc) {
-		this.funnel = funnel;
+	StripeWebhookController(ApplicationEventPublisher events, NamedParameterJdbcTemplate jdbc) {
+		this.events = events;
 		this.jdbc = jdbc;
 	}
 
@@ -94,10 +102,21 @@ class StripeWebhookController {
 
 		try {
 			switch (type) {
-				case "payment_intent.succeeded" -> funnel.paymentSucceeded(intentId, intentId);
+				// Published synchronously on purpose. A listener that throws
+				// must reach the catch below, so the receipt stays unprocessed
+				// and Stripe retries — an asynchronous publish would answer 200
+				// and lose the failure.
+				case "payment_intent.succeeded" ->
+					events.publishEvent(new PaymentSettled(intentId, intentId));
 				case "payment_intent.payment_failed", "payment_intent.canceled" ->
-					funnel.paymentFailed(intentId,
-						intent.path("last_payment_error").path("message").asText("payment failed"));
+					events.publishEvent(new PaymentFailed(intentId,
+						intent.path("last_payment_error").path("message").asText("payment failed")));
+				// Payability is re-read on every account change, never
+				// remembered from onboarding: Stripe can restrict an account
+				// long after approving it, and the first sign is otherwise a
+				// failed transfer — after we have taken the customer's money.
+				case "account.updated" ->
+					events.publishEvent(new ConnectedAccountUpdated(intentId));
 				default -> log.debug("ignoring stripe event {}", type);
 			}
 		}
