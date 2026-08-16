@@ -58,12 +58,22 @@ API without anything hand-written in between:
   Bad and missing signatures are rejected 401 and still recorded
 - Both databases up, PostGIS 3.4 working, Cal.diy healthy and migrated
 
+- **The booking funnel runs**, with its state machine, trail and compensations.
+  A live checkout reserved a real slot in Cal, verified the read-back, charged,
+  failed to confirm, refunded, failed to release, and ended `NEEDS_ATTENTION` —
+  each step written to `booking_attempt_step`. A second checkout for that slot
+  was then refused by Cal and recorded as the first `availability_miss`
+- 25 tests, covering every compensation path including the ones that only run
+  after a compensation itself fails
+
 Sketch:
 
-- Bookings, payments and provider onboarding do not exist yet
-- No frontend
-- Cal's v2 REST API is not deployed, and availability does not need it — see
-  ADR 0007
+- **Cal's `api-v2` is not deployed, and the funnel needs it.** Reserving is
+  public; confirming and cancelling are not. See the design note — this is a
+  deployment step, not a code one
+- Payments run through a dev gateway that moves no money; Stripe Connect is not
+  wired
+- Provider onboarding and the frontend do not exist yet
 
 ```bash
 ./seed/cal-dev.sh                              # supply, both sides

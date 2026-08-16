@@ -145,13 +145,39 @@ wherever onboarding creates event types for real.
   every authority's answer, every compensation. This is the row you read when a
   customer says they were charged for nothing.
 
-## Open question this hands to implementation
+## Resolved: the funnel needs api-v2, and not for the reason expected
 
-`/api/book/event` exists in the web image and validates input, so writes do not
-force us to build `api-v2` any more than reads did. But the calculus differs: an
-internal API changing shape on a **read** means a stale index, while on a
-**write** it means a customer charged for an appointment that does not exist.
+The open question was whether writes force us to build `api-v2`. Probed against
+the running Cal, the answer is yes — but the blocker is not creating bookings.
 
-The mitigation is to not trust the write. Read the booking back from Cal between
-stage 6 and stage 7, and treat that read as the gate on taking money. Then pin
-the Cal image version hard and re-probe both endpoints on every upgrade.
+| endpoint | auth | result |
+|---|---|---|
+| `POST /api/book/event` | public | **works** |
+| `POST /api/trpc/bookings/confirm` | — | 401 |
+| `POST /api/cancel` | — | 403, wants a session CSRF token |
+
+Creating a booking is public, because that is what a customer does on the
+booking page. Confirming and cancelling are privileged, because those are things
+a *salon* does. A bearer token does not get in either.
+
+So we can reserve and cannot take it back — which is strictly worse than not
+being able to reserve at all. Every failed payment strands a pending booking
+that blocks a real slot, permanently, with no automated path to release it.
+
+**Observed, not predicted.** A live checkout ran reserve → verify → charge →
+confirm; confirm failed, the refund succeeded, the release did not, and the
+attempt ended `NEEDS_ATTENTION`. The next checkout for that slot was then
+refused by Cal with `no_available_users_found_error` — a real customer would
+have been turned away from a slot nobody holds. Releasing it required deleting
+the row from Cal's database by hand.
+
+The write is still not trusted: the read-back gate between stages 6 and 7 stays,
+because an internal API changing shape on a read means a stale index, while on a
+write it means charging for an appointment that does not exist. Pin the Cal
+image version and re-probe every endpoint on upgrade.
+
+**Next step is deployment, not code.** `CalBookingPort` already has `confirm` and
+`cancel`; they throw until `marketplace.cal.api-v2-url` is set, which routes
+affected attempts to `NEEDS_ATTENTION` rather than silently reporting a
+cancellation that never happened. Standing `api-v2` up is a configuration change
+from here.
