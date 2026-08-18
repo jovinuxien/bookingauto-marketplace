@@ -134,6 +134,17 @@ API without anything hand-written in between:
   can sign in and see its own summary. See ADR 0011
 - 71 tests and 17 browser tests
 
+- **Addresses become coordinates.** A sweep places salons that registered
+  without them — never inline, so an OSM outage cannot fail a signup. Results
+  coarser than a street are refused, because a geocoder answers an address it
+  cannot find with the city centre, and a point that is wrong by kilometres is
+  worse than no point at all. Verified against real signups: two Stockholm
+  addresses matched at rooftop precision, and `Munins gata 6 lgh 1101` — which
+  returns nothing at all as written — matched its street once the apartment was
+  stripped. What no geocoder can place, an operator places by hand, and that
+  placement then outranks the sweep permanently
+- 84 tests
+
 Sketch:
 
 - Stripe is exercised only against `stripe-mock`, which validates request shape
@@ -141,11 +152,10 @@ Sketch:
   onboarding and payouts need a Stripe test account
 - Provider onboarding leaves the salon with two logins, ours and Cal's — the
   cost of not having a Cal licence. See ADR 0010
-- **Nothing geocodes an address.** A salon that registers itself has a street
-  address and no coordinates, so it appears on its city page and is invisible to
-  the radius search that is the product's primary filter. Left NULL rather than
-  guessed at the town centre, which would look correct and be wrong. An operator
-  has to place each self-serve salon until there is a geocoder
+- Geocoding uses the **public** Nominatim instance by default, which permits one
+  request per second and forbids bulk use. Fine for a handful of salons a day;
+  point `MARKETPLACE_GEOCODING_NOMINATIM_URL` at a self-hosted instance before
+  that stops being true
 - **Confirming a booking needs a paid Cal licence**, so we create auto-accepting
   event types and never need to. See ADR 0008 — this is the constraint most
   likely to shape what comes next
@@ -166,7 +176,7 @@ seed/                  dev fixtures — cal-dev.sh seeds both sides
 docs/decisions/        ADRs — why, not what
 docs/design/           booking-funnel.md — the saga, stage by stage
 backend/               Spring Modulith: search, sync, booking, payments,
-                       onboarding, console, signup, landing, notifications
+                       onboarding, console, signup, landing, notifications, geo
   src/main/webapp/app/ React SPA — config/, shared/, modules/; built into the jar
 ```
 
@@ -235,9 +245,10 @@ In the order worth doing it:
 
 1. A Stripe test account, to verify the half that `stripe-mock` cannot: real
    Swish redirection, webhook signatures, Connect onboarding, payouts.
-2. Geocoding. A salon that registers itself has an address and no coordinates,
-   so it is invisible to the radius search — which is the product's primary
-   filter. This is now the largest gap between "registered" and "sellable".
+2. A consumer identity. There is one consumer write endpoint and no way back to
+   a booking: no account, no history, no cancel, no reschedule. The `booking`
+   table already allows `cancelled` and `refunded` and nothing ever sets them,
+   which makes this the largest remaining gap in the product.
 3. HTML email. The messages are plain text, which is honest and legible but
    not what a consumer brand ships.
 4. Rate-limit the login endpoint. The limiter built for signup is general and
@@ -245,8 +256,8 @@ In the order worth doing it:
    small one.
 
 Done: the availability reconciler, the booking funnel with its compensations,
-Stripe Connect with the asynchronous payment path, provider onboarding, and
-self-serve signup.
+Stripe Connect with the asynchronous payment path, provider onboarding,
+self-serve signup, and geocoding.
 
 ## Known shape problems, recorded early
 
@@ -341,6 +352,58 @@ matters: production has no relay on localhost, so a misconfigured deployment
 fails loudly into the outbox and retries, and reaching real customers still
 means deliberately pointing `MAIL_HOST` at a real server. Set
 `MARKETPLACE_NOTIFICATIONS_TRANSPORT=log` to silence delivery entirely.
+
+## Placing a salon on the map
+
+A salon that registers itself gives a street address. The radius search that is
+this product's primary filter needs a point, so something has to turn one into
+the other.
+
+```bash
+MARKETPLACE_GEOCODING_PROVIDER=nominatim ./run.sh
+```
+
+Off by default. Enabling a geocoder by default would point every developer
+machine and every CI run at a public service with a strict usage policy, from an
+application whose whole job is to submit addresses to it.
+
+Three things about it are deliberate:
+
+- **It never runs during signup.** A sweep picks up salons that arrived without
+  coordinates, in small spaced batches. Geocoding inline would put a third
+  party's uptime directly in front of a registration, so an OSM outage would
+  become a salon that could not join. Here it becomes a salon that is unfindable
+  for a few minutes longer.
+- **It refuses to guess.** Asked for an address it cannot find, a geocoder
+  answers with the city — a point that looks right on a map and is wrong by
+  kilometres. Only matches at street or building precision are stored, on an
+  allow-list of result types rather than a deny-list, because the failure mode
+  being guarded against is the one nobody anticipated. Everything else is left
+  null and handed to a person.
+- **A person always outranks the sweep.** Real addresses exist that no geocoder
+  will match: a new building, a unit inside a shopping centre, a salon in
+  someone's home. Once an operator has placed one, no later geocode moves it.
+
+Addresses are normalised before being sent — apartment, floor and care-of are
+removed, because map data does not model them. This is not cosmetic:
+`Munins gata 6 lgh 1101` is a real registration on this platform and returns
+nothing at all as written.
+
+```bash
+# what still has no point, and why
+curl -b cookies http://localhost:8090/api/placements
+
+# place one by hand
+curl -b cookies -X PUT http://localhost:8090/api/placements/10 \
+  -H 'Content-Type: application/json' -H "X-XSRF-TOKEN: $TOKEN" \
+  -d '{"latitude":55.5601,"longitude":12.9830}'
+```
+
+Both are platform-admin only, and both sit under `/api/placements` rather than
+`/api/providers` on purpose: that prefix carries a public GET rule for the
+consumer catalogue, and an operator listing of unplaced salons — addresses
+included — behind an earlier `permitAll` matcher is a leak that compiles, passes
+every test and is invisible.
 
 ## Self-serve signup
 

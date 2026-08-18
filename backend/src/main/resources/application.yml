@@ -103,6 +103,45 @@ marketplace:
     expiry-sweep-ms: ${MARKETPLACE_SIGNUP_EXPIRY_SWEEP_MS:900000}
     rate-sweep-ms: ${MARKETPLACE_SIGNUP_RATE_SWEEP_MS:3600000}
 
+  geocoding:
+    # 'none' by default, and that is not laziness. Enabling a geocoder by
+    # default would point every developer machine and every CI run at a public
+    # service with a strict usage policy, from an application whose entire job
+    # is to submit addresses to it. Opting in is one line; being silently
+    # blocked for bulk geocoding is not something to discover in production.
+    provider: ${MARKETPLACE_GEOCODING_PROVIDER:none}
+
+    nominatim:
+      # The public OpenStreetMap instance. Fine for development and for a
+      # handful of salons a day; its policy is an absolute maximum of one
+      # request per second and no bulk geocoding. Point this at a self-hosted
+      # instance before that stops being true -- the data is ODbL and the
+      # container is well travelled.
+      base-url: ${MARKETPLACE_GEOCODING_NOMINATIM_URL:https://nominatim.openstreetmap.org}
+
+      # Required by the usage policy, and required to identify this application
+      # rather than the HTTP library. A default Java user agent is what gets an
+      # address blocked.
+      user-agent: ${MARKETPLACE_GEOCODING_USER_AGENT:booking-marketplace/0.1 (+http://localhost:8090)}
+
+      timeout-seconds: ${MARKETPLACE_GEOCODING_TIMEOUT_SECONDS:10}
+
+    # How many times one address is asked about before it becomes an operator's
+    # problem. Low on purpose: a refusal almost always means the address cannot
+    # be matched at all -- an apartment number, a new building, a typo -- and
+    # none of those are fixed by asking a fourth time.
+    max-attempts: ${MARKETPLACE_GEOCODING_MAX_ATTEMPTS:3}
+
+    # Small batches, spaced. A backlog is worked off across several passes
+    # rather than in one burst against someone else's rate limit.
+    batch-size: ${MARKETPLACE_GEOCODING_BATCH_SIZE:5}
+    pause-ms: ${MARKETPLACE_GEOCODING_PAUSE_MS:1200}
+    interval-ms: ${MARKETPLACE_GEOCODING_INTERVAL_MS:300000}
+
+    # Long enough that startup, migrations and the first reconcile are done
+    # before this competes for the scheduler.
+    initial-delay-ms: ${MARKETPLACE_GEOCODING_INITIAL_DELAY_MS:20000}
+
   checkout:
     # Nobody sends a webhook for a customer who simply walked away, so this is
     # what returns their slot. Errs long: reselling a slot someone has just paid

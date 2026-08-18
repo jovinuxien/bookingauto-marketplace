@@ -110,6 +110,19 @@ class SecurityConfig {
 				// exactly why the public path is /api/signup and not this.
 				.requestMatchers(HttpMethod.POST, "/api/providers").hasRole("PLATFORM_ADMIN")
 
+				// --- placing a salon on the map ---------------------------------
+				// Operator-only for the same reason onboarding is: where a salon sits
+				// decides who finds it, and a salon able to move itself could appear
+				// in a district it is not in.
+				//
+				// Under its own prefix rather than /api/providers/** on purpose. The
+				// public GET rule above matches /api/providers/* and is declared
+				// earlier, so an operator listing placed there would be shadowed by it
+				// and served to anyone -- addresses included. Keeping the surface on a
+				// path no public rule mentions means this cannot be reintroduced by
+				// reordering.
+				.requestMatchers("/api/placements", "/api/placements/**").hasRole("PLATFORM_ADMIN")
+
 				// --- a salon's own setup --------------------------------------
 				// Authentication only; the ownership check is in the controller,
 				// because "is this your provider" is a data question that a URL
