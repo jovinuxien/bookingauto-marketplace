@@ -7,9 +7,10 @@ import provider from 'app/shared/reducers/provider.reducer';
 import booking from 'app/shared/reducers/booking.reducer';
 import auth from 'app/shared/reducers/auth.reducer';
 import consoleReducer from 'app/shared/reducers/console.reducer';
+import signup from 'app/shared/reducers/signup.reducer';
 
 const store = configureStore({
-  reducer: { search, provider, booking, auth, console: consoleReducer },
+  reducer: { search, provider, booking, auth, console: consoleReducer, signup },
 });
 
 export type RootState = ReturnType<typeof store.getState>;

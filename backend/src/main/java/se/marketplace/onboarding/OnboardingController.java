@@ -31,11 +31,12 @@ class OnboardingController {
 	ResponseEntity<?> create(@RequestBody NewProviderRequest request) {
 		try {
 			var onboarded = onboarding.start(new ProviderOnboarding.NewProvider(
-				request.slug(), request.name(), request.city(), request.email(),
-				request.calPassword(), request.longitude(), request.latitude()));
+				request.slug(), request.name(), request.city(), request.addressLine(),
+				request.postalCode(), request.email(), request.calPassword(),
+				request.longitude(), request.latitude()));
 			return ResponseEntity.status(HttpStatus.CREATED).body(onboarded);
 		}
-		catch (ProviderOnboarding.AlreadyOnCal e) {
+		catch (ProviderOnboarding.AlreadyOnCal | ProviderOnboarding.AlreadyOnboarded e) {
 			// 409, not 500. The salon has onboarded before and the right next
 			// move is to link the existing account, which is a decision for a
 			// human rather than a retry.
@@ -62,6 +63,8 @@ class OnboardingController {
 		String slug,
 		String name,
 		String city,
+		String addressLine,
+		String postalCode,
 		String email,
 		String calPassword,
 		Double longitude,

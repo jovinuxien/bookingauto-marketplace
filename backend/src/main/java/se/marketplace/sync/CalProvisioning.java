@@ -3,12 +3,14 @@ package se.marketplace.sync;
 import java.net.http.HttpClient;
 import java.sql.ResultSet;
 import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -49,12 +51,18 @@ class CalProvisioning implements CalProvisioningPort {
 	@Override
 	public CalUser createUser(NewCalUser request) {
 		try {
+			// Serialised by Jackson rather than formatted into a string. The
+			// values used to come from an operator typing them; they now come
+			// from a public signup form, and a quotation mark in an address
+			// would otherwise rewrite the request body. Validating the input
+			// upstream is worth doing and is not what makes this safe.
 			http.post()
 				.uri(baseUrl + "/api/auth/signup")
-				.header("Content-Type", "application/json")
-				.body("""
-					{"username":"%s","email":"%s","password":"%s"}"""
-					.formatted(request.username(), request.email(), request.password()))
+				.contentType(MediaType.APPLICATION_JSON)
+				.body(Map.of(
+					"username", request.username(),
+					"email", request.email(),
+					"password", request.password()))
 				.retrieve()
 				.toBodilessEntity();
 		}

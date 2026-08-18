@@ -25,9 +25,14 @@ const Header = () => {
               </button>
             </>
           ) : (
-            <Link className="navbar-text small text-white" to="/logga-in">
-              För salonger
-            </Link>
+            <>
+              <Link className="navbar-text small text-white" to="/logga-in">
+                För salonger
+              </Link>
+              <Link className="btn btn-sm btn-outline-light" to="/registrera">
+                Anslut din salong
+              </Link>
+            </>
           )}
         </div>
       </div>

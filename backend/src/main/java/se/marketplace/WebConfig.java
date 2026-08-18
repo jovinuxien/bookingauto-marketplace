@@ -36,6 +36,12 @@ class WebConfig implements WebMvcConfigurer {
 		registry.addViewController("/boka/{serviceId}").setViewName("forward:/index.html");
 		registry.addViewController("/logga-in").setViewName("forward:/index.html");
 		registry.addViewController("/konsol").setViewName("forward:/index.html");
+		registry.addViewController("/registrera").setViewName("forward:/index.html");
+		// Where the verification email lands, which means it is typed by nobody
+		// and arrives cold from a mail client. A route the security config
+		// permits but this list forgets returns Spring's own error page, and the
+		// permit reads as though the page works.
+		registry.addViewController("/verifiera").setViewName("forward:/index.html");
 	}
 
 }

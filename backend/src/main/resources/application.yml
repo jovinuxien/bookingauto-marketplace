@@ -44,6 +44,11 @@ marketplace:
     webhook-secret: ${MARKETPLACE_CAL_WEBHOOK_SECRET:}
     timezone: Europe/Stockholm
 
+  # Where this deployment is reachable, used in the links we email out. A
+  # verification link pointing at localhost arrives in a real inbox and cannot
+  # be clicked, which is the kind of failure nothing in the system can detect.
+  public-url: ${MARKETPLACE_PUBLIC_URL:http://localhost:8090}
+
   # Basis points, frozen onto each attempt at quote time so a rate change
   # cannot retroactively alter a sale already in flight.
   commission-bps: 1500
@@ -73,6 +78,30 @@ marketplace:
     from: ${MARKETPLACE_NOTIFICATIONS_FROM:no-reply@example.se}
     interval-ms: ${MARKETPLACE_NOTIFICATIONS_INTERVAL_MS:15000}
     max-attempts: 8
+
+  signup:
+    # How long the verification link works. A day is long enough for someone who
+    # registered in the evening and read their email at work; much longer and it
+    # is a live credential sitting in a mailbox.
+    token-ttl-hours: ${MARKETPLACE_SIGNUP_TOKEN_TTL_HOURS:24}
+
+    # Per hour, per source. Generous for a person and useless for a script:
+    # what these defend is Cal and Stripe, which is why the numbers are small
+    # even though the endpoint itself is cheap to serve.
+    #
+    # The IP limit is the loose one on purpose -- it is counted before the form
+    # is validated, so a person mistyping a postal code several times must not
+    # lock themselves out for an hour. A shared office address is also one IP.
+    per-ip-per-hour: ${MARKETPLACE_SIGNUP_PER_IP_PER_HOUR:10}
+    per-email-per-hour: ${MARKETPLACE_SIGNUP_PER_EMAIL_PER_HOUR:3}
+
+    # Higher, and about a different thing. Guessing a 256-bit token is not a
+    # strategy, so this is only there to stop someone using the endpoint as a
+    # way to generate load.
+    verify-per-ip-per-hour: ${MARKETPLACE_SIGNUP_VERIFY_PER_IP_PER_HOUR:30}
+
+    expiry-sweep-ms: ${MARKETPLACE_SIGNUP_EXPIRY_SWEEP_MS:900000}
+    rate-sweep-ms: ${MARKETPLACE_SIGNUP_RATE_SWEEP_MS:3600000}
 
   checkout:
     # Nobody sends a webhook for a customer who simply walked away, so this is

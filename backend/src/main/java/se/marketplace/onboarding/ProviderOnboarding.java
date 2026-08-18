@@ -68,32 +68,83 @@ public class ProviderOnboarding {
 	 * dangling if a later step fails: our row, then Cal, then Stripe. A provider
 	 * with a Cal account and no Stripe account is a resumable state; a Stripe
 	 * account with no provider row is an orphan nobody will ever look at.
+	 *
+	 * <p><strong>And it is now actually resumable.</strong> Each step is skipped
+	 * if its result already exists, so calling this again after Stripe was
+	 * briefly unreachable continues from where it stopped rather than building a
+	 * second half-finished salon and then colliding on the Cal username. That
+	 * mattered less when an operator ran this by hand and could look; it matters
+	 * a great deal now that a salon signing up itself is the caller, because the
+	 * alternative to a retry is a support ticket for every transient failure.
+	 *
+	 * <p>Resuming is restricted to a provider that never became sellable. Re-running
+	 * this against a live salon would be a different and much worse thing.
 	 */
 	public Onboarded start(NewProvider request) {
-		long providerId = repository.create(request.slug(), request.name(), request.city(),
-			request.email(), request.longitude(), request.latitude());
+		Provider provider = repository.findBySlug(request.slug())
+			.map(ProviderOnboarding::mustBeResumable)
+			.orElse(null);
+
+		long providerId = provider != null
+			? provider.id()
+			: repository.create(request.slug(), request.name(), request.city(),
+				request.addressLine(), request.postalCode(), request.email(),
+				request.longitude(), request.latitude());
 
 		String calUsername = request.slug();
+		boolean calAccountCreated = false;
 
-		try {
-			var user = cal.createUser(new CalProvisioningPort.NewCalUser(
-				calUsername, request.email(), request.calPassword()));
-			repository.recordCalUser(providerId, user.id(), user.username());
+		if (provider == null || provider.calUserId() == null) {
+			try {
+				var user = cal.createUser(new CalProvisioningPort.NewCalUser(
+					calUsername, request.email(), request.calPassword()));
+				repository.recordCalUser(providerId, user.id(), user.username());
+				calAccountCreated = true;
+			}
+			catch (CalProvisioningPort.CalUserExists e) {
+				// Almost always a salon onboarding a second time. Not an error, but
+				// not something to paper over either: linking silently would attach
+				// us to an account we have not verified they control.
+				log.warn("cal user {} already exists for provider {}", calUsername, providerId);
+				throw new AlreadyOnCal(calUsername);
+			}
 		}
-		catch (CalProvisioningPort.CalUserExists e) {
-			// Almost always a salon onboarding a second time. Not an error, but
-			// not something to paper over either: linking silently would attach
-			// us to an account we have not verified they control.
-			log.warn("cal user {} already exists for provider {}", calUsername, providerId);
-			throw new AlreadyOnCal(calUsername);
+
+		String accountId = provider == null ? null : provider.stripeAccountId();
+
+		if (accountId == null) {
+			accountId = connect.createAccount(new StripeConnectPort.NewAccount(
+				providerId, request.name(), request.email(), country)).accountId();
+			repository.recordStripeAccount(providerId, accountId);
 		}
 
-		var account = connect.createAccount(new StripeConnectPort.NewAccount(
-			providerId, request.name(), request.email(), country));
-		repository.recordStripeAccount(providerId, account.accountId());
+		return new Onboarded(providerId, calUsername, accountId,
+			connect.onboardingLink(accountId, returnUrl, refreshUrl), calAccountCreated);
+	}
 
-		return new Onboarded(providerId, calUsername, account.accountId(),
-			connect.onboardingLink(account.accountId(), returnUrl, refreshUrl));
+	/**
+	 * Whether a name is still free.
+	 *
+	 * <p>Checked before anything is created rather than discovered from a unique
+	 * violation, because the collision a self-serve form actually produces is two
+	 * salons with the same name — and the second of them deserves to be told
+	 * while they are still looking at the form.
+	 */
+	public boolean slugAvailable(String slug) {
+		return repository.findBySlug(slug).isEmpty();
+	}
+
+	/**
+	 * @throws AlreadyOnboarded for a provider that got all the way through. Half
+	 *         finished is resumable; finished is not, and quietly re-running the
+	 *         steps against a salon that is already selling would at best mint a
+	 *         second Stripe account for it
+	 */
+	private static Provider mustBeResumable(Provider provider) {
+		if ("ready".equals(provider.onboardingState()) || "active".equals(provider.status())) {
+			throw new AlreadyOnboarded(provider.slug());
+		}
+		return provider;
 	}
 
 	/**
@@ -201,17 +252,27 @@ public class ProviderOnboarding {
 		String slug,
 		String name,
 		String city,
+		String addressLine,
+		String postalCode,
 		String email,
 		String calPassword,
 		Double longitude,
 		Double latitude
 	) {}
 
+	/**
+	 * @param calAccountCreated false when the Cal account already existed and
+	 *        this call resumed onboarding rather than starting it. The caller
+	 *        needs to know: it decides whether there is a new Cal password to
+	 *        pass on, and telling someone their password is one they have never
+	 *        seen is worse than telling them nothing
+	 */
 	public record Onboarded(
 		long providerId,
 		String calUsername,
 		String stripeAccountId,
-		String kycUrl
+		String kycUrl,
+		boolean calAccountCreated
 	) {}
 
 	/**
@@ -223,6 +284,13 @@ public class ProviderOnboarding {
 	public static class AlreadyOnCal extends RuntimeException {
 		public AlreadyOnCal(String username) {
 			super("cal account " + username + " already exists");
+		}
+	}
+
+	/** The provider finished onboarding already. Not something to redo. */
+	public static class AlreadyOnboarded extends RuntimeException {
+		public AlreadyOnboarded(String slug) {
+			super("provider " + slug + " has already been onboarded");
 		}
 	}
 

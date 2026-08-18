@@ -17,6 +17,15 @@ export interface ApiError {
   message: string;
   /** True when retrying the identical request cannot help. */
   terminal: boolean;
+  /**
+   * The response body, when the server sent one.
+   *
+   * Carried through because some failures are not a sentence to show the user
+   * but a structure to render — a signup rejected field by field being the
+   * first. The generic message above still applies to everything that has no
+   * better answer, and a caller reading this has to know its shape itself.
+   */
+  data?: unknown;
 }
 
 export const setupAxiosInterceptors = (onUnauthenticated: () => void) => {
@@ -33,6 +42,7 @@ export const setupAxiosInterceptors = (onUnauthenticated: () => void) => {
         status: status ?? 0,
         message: messageFor(status, error),
         terminal: status === 409 || status === 404,
+        data: error?.response?.data,
       };
 
       return Promise.reject(apiError);

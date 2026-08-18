@@ -6,6 +6,8 @@ import SearchResults from 'app/modules/search/search-results';
 import ProviderPage from 'app/modules/provider/provider-page';
 import Checkout from 'app/modules/booking/checkout';
 import Login from 'app/modules/login/login';
+import Register from 'app/modules/signup/register';
+import Verify from 'app/modules/signup/verify';
 import Console from 'app/modules/console/console';
 import PrivateRoute from 'app/shared/auth/private-route';
 import NotFound from 'app/shared/error/not-found';
@@ -25,6 +27,10 @@ const AppRoutes = () => (
     <Route path="/boka/:serviceId" element={<Checkout />} />
 
     {/* The business side. Guarded here for rendering; enforced on the server. */}
+    <Route path="/registrera" element={<Register />} />
+    {/* Where the verification email lands. Public by necessity: the token in
+        the query string is the only credential the visitor has. */}
+    <Route path="/verifiera" element={<Verify />} />
     <Route path="/logga-in" element={<Login />} />
     <Route path="/konsol" element={<PrivateRoute><Console /></PrivateRoute>} />
     <Route path="*" element={<NotFound />} />

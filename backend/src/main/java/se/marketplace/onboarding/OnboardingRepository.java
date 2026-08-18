@@ -19,20 +19,29 @@ class OnboardingRepository {
 		this.jdbc = jdbc;
 	}
 
-	long create(String slug, String name, String city, String email,
-		Double longitude, Double latitude) {
+	long create(String slug, String name, String city, String addressLine, String postalCode,
+		String email, Double longitude, Double latitude) {
 
 		var keys = new GeneratedKeyHolder();
 		jdbc.update("""
-			INSERT INTO provider (slug, name, city, contact_email, status, onboarding_state, location)
-			VALUES (:slug, :name, :city, :email, 'draft', 'started',
-			        CASE WHEN :lon IS NULL THEN NULL
-			             ELSE ST_MakePoint(:lon, :lat)::geography END)
+			INSERT INTO provider (slug, name, city, address_line, postal_code, contact_email,
+			                      status, onboarding_state, location)
+			VALUES (:slug, :name, :city, :address, :postal, :email, 'draft', 'started',
+			        -- Cast, because Postgres cannot infer a parameter's type from
+			        -- "IS NULL" alone and refuses the whole statement with "could
+			        -- not determine data type of parameter $7". It only bites when
+			        -- the coordinates are actually null, which no operator-typed
+			        -- provider ever was and every self-serve one is.
+			        CASE WHEN CAST(:lon AS double precision) IS NULL THEN NULL
+			             ELSE ST_MakePoint(CAST(:lon AS double precision),
+			                               CAST(:lat AS double precision))::geography END)
 			""",
 			new MapSqlParameterSource()
 				.addValue("slug", slug)
 				.addValue("name", name)
 				.addValue("city", city)
+				.addValue("address", addressLine)
+				.addValue("postal", postalCode)
 				.addValue("email", email)
 				.addValue("lon", longitude)
 				.addValue("lat", latitude),
@@ -43,6 +52,11 @@ class OnboardingRepository {
 	Optional<Provider> find(long id) {
 		return jdbc.query("SELECT * FROM provider WHERE id = :id",
 			new MapSqlParameterSource("id", id), PROVIDER).stream().findFirst();
+	}
+
+	Optional<Provider> findBySlug(String slug) {
+		return jdbc.query("SELECT * FROM provider WHERE slug = :s",
+			new MapSqlParameterSource("s", slug), PROVIDER).stream().findFirst();
 	}
 
 	Optional<Provider> findByStripeAccount(String accountId) {

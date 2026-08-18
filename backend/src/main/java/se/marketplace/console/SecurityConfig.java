@@ -59,14 +59,19 @@ class SecurityConfig {
 				// cannot hold a CSRF token either.
 				.ignoringRequestMatchers("/internal/**")
 				// Anonymous and session-free: there is no ambient authority for
-				// a forged request to borrow.
+				// a forged request to borrow. Signup is the same shape -- a
+				// caller with no session has nothing for a forgery to ride on,
+				// and what actually protects it is the rate limit and the fact
+				// that it creates nothing until an email is answered.
 				.ignoringRequestMatchers(
-					new AntPathRequestMatcher("/api/bookings", HttpMethod.POST.name())))
+					new AntPathRequestMatcher("/api/bookings", HttpMethod.POST.name()),
+					new AntPathRequestMatcher("/api/signup/**", HttpMethod.POST.name())))
 
 			.authorizeHttpRequests(it -> it
 				// --- the SPA itself -------------------------------------------
 				.requestMatchers("/", "/index.html", "/assets/**", "/favicon.ico").permitAll()
 				.requestMatchers("/sok", "/salong/**", "/boka/**", "/logga-in", "/konsol/**").permitAll()
+				.requestMatchers("/registrera", "/verifiera").permitAll()
 
 				// --- the crawlable pages ---------------------------------------
 				// Server-rendered, and useless if a crawler is asked to sign in.
@@ -91,11 +96,18 @@ class SecurityConfig {
 
 				.requestMatchers("/api/auth/login").permitAll()
 
-				// --- onboarding is an operator action -------------------------
-				// Left open, this would let anyone on the internet create
-				// providers and Stripe accounts. Self-serve salon signup needs
-				// email verification and rate limiting before it can face the
-				// public, and does not exist yet.
+				// --- a salon registering itself --------------------------------
+				// Public, and the only public endpoint that causes anything to
+				// be created outside this system. It is safe to expose for two
+				// specific reasons, both in the signup module: it provisions
+				// nothing until a link sent to the address is clicked, and every
+				// entry point is counted and capped before it does any work.
+				.requestMatchers(HttpMethod.POST, "/api/signup", "/api/signup/verify").permitAll()
+
+				// --- onboarding by an operator ---------------------------------
+				// Still admin-only. This one creates the Cal and Stripe accounts
+				// immediately, with no verification in front of it, which is
+				// exactly why the public path is /api/signup and not this.
 				.requestMatchers(HttpMethod.POST, "/api/providers").hasRole("PLATFORM_ADMIN")
 
 				// --- a salon's own setup --------------------------------------

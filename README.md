@@ -126,6 +126,14 @@ API without anything hand-written in between:
   delivers it. Verified over real SMTP into MailHog, with the Swedish subject
   correctly UTF-8 encoded
 
+- **A salon can register itself**, and the ordering is the point: registration
+  writes one row and sends one link, and creates no provider, no Cal user and no
+  Stripe account. Clicking the link is what provisions. Verified end to end — a
+  form at `/registrera`, a 202, a verification mail in MailHog, and after the
+  click a Cal user, a Stripe connected account, a console login and a salon that
+  can sign in and see its own summary. See ADR 0011
+- 71 tests and 17 browser tests
+
 Sketch:
 
 - Stripe is exercised only against `stripe-mock`, which validates request shape
@@ -133,7 +141,11 @@ Sketch:
   onboarding and payouts need a Stripe test account
 - Provider onboarding leaves the salon with two logins, ours and Cal's — the
   cost of not having a Cal licence. See ADR 0010
-- Provider onboarding and the frontend do not exist yet
+- **Nothing geocodes an address.** A salon that registers itself has a street
+  address and no coordinates, so it appears on its city page and is invisible to
+  the radius search that is the product's primary filter. Left NULL rather than
+  guessed at the town centre, which would look correct and be wrong. An operator
+  has to place each self-serve salon until there is a geocoder
 - **Confirming a booking needs a paid Cal licence**, so we create auto-accepting
   event types and never need to. See ADR 0008 — this is the constraint most
   likely to shape what comes next
@@ -148,12 +160,13 @@ curl "http://localhost:8090/api/search?lat=59.32&lon=18.06&radius=5000&day=2026-
 
 ```
 docker-compose.yml     cal, cal-api (v2), redis, two databases
-db/                    marketplace schema; 002 is applied by hand
+db/                    marketplace schema; 002 onwards are applied by hand
 docker/                build-api-v2.sh — no published image exists
 seed/                  dev fixtures — cal-dev.sh seeds both sides
 docs/decisions/        ADRs — why, not what
 docs/design/           booking-funnel.md — the saga, stage by stage
-backend/               Spring Modulith: search, sync, booking, payments, onboarding
+backend/               Spring Modulith: search, sync, booking, payments,
+                       onboarding, console, signup, landing, notifications
   src/main/webapp/app/ React SPA — config/, shared/, modules/; built into the jar
 ```
 
@@ -222,13 +235,18 @@ In the order worth doing it:
 
 1. A Stripe test account, to verify the half that `stripe-mock` cannot: real
    Swish redirection, webhook signatures, Connect onboarding, payouts.
-2. Self-serve salon signup. Onboarding is an operator action today, because
-   opening it needs email verification and rate limiting first.
+2. Geocoding. A salon that registers itself has an address and no coordinates,
+   so it is invisible to the radius search — which is the product's primary
+   filter. This is now the largest gap between "registered" and "sellable".
 3. HTML email. The messages are plain text, which is honest and legible but
    not what a consumer brand ships.
+4. Rate-limit the login endpoint. The limiter built for signup is general and
+   the login form has none, which is a separate decision from ADR 0011 and a
+   small one.
 
 Done: the availability reconciler, the booking funnel with its compensations,
-Stripe Connect with the asynchronous payment path, and provider onboarding.
+Stripe Connect with the asynchronous payment path, provider onboarding, and
+self-serve signup.
 
 ## Known shape problems, recorded early
 
@@ -261,8 +279,8 @@ Backend-only builds pass `-Dskip.npm=true`, which is the default.
 
 ```bash
 cd backend
-mvn test              # 38 — logic, module boundaries, every compensation path
-npx playwright test   # 11 — what a person actually sees, needs a running stack
+mvn test              # 71 — logic, module boundaries, every compensation path
+npx playwright test   # 17 — what a person actually sees, needs a running stack
 ```
 
 The browser suite exists for one reason. The landing pages once returned
@@ -274,7 +292,15 @@ stay green while the browser tests failed.
 
 It uses the Chrome already installed rather than downloading its own, and steps
 forward to an open day rather than assuming today is one: the seeded salons are
-closed at weekends, and a suite that fails two days in seven gets ignored.
+closed at weekends, and a suite that fails two days in seven gets ignored. That
+day-stepping is the suite's one flaky spot — under parallel load it can walk
+past an open day whose slots have not rendered yet, and passes on a rerun.
+
+The signup tests stop deliberately before clicking a verification link. That
+half creates a Cal user and a Stripe connected account, neither of which is
+cleaned up, and a browser suite that leaves accounts behind in other systems on
+every run is one people start skipping. What they do cover is the property that
+makes the endpoint safe to expose: registering creates nothing.
 
 ## The security model
 
@@ -286,7 +312,8 @@ now listed on purpose in `console/SecurityConfig`. Four categories:
 | the SPA and the consumer journey | anonymous — requiring an account to see availability would cost more bookings than it could protect |
 | `/internal/**` | verified by signature, not by session |
 | `/api/console/**` | authenticated, scoped to the session's provider |
-| `POST /api/providers` | platform admin only |
+| `/api/signup/**` | anonymous, rate limited, and provisions nothing until a link sent to the address is clicked |
+| `POST /api/providers` | platform admin only — it creates the Cal and Stripe accounts immediately, which is exactly why the public path is `/api/signup` |
 
 Sessions rather than tokens: the SPA ships in the same jar, so the cookie is
 first-party and `HttpOnly` and no script can read it. CSRF protection is
@@ -308,6 +335,55 @@ docker compose up -d mailhog          # :8026 for the web UI
 MARKETPLACE_NOTIFICATIONS_TRANSPORT=smtp mvn spring-boot:run
 ```
 
-Sending is opt-in (`transport=log` by default). A machine that starts emailing
-real customers because a config file was copied is worse than one that stays
-quiet.
+The transport defaults to `smtp` at `spring.mail.host`, which itself defaults to
+localhost — where docker-compose runs MailHog. That is safe for the reason that
+matters: production has no relay on localhost, so a misconfigured deployment
+fails loudly into the outbox and retries, and reaching real customers still
+means deliberately pointing `MAIL_HOST` at a real server. Set
+`MARKETPLACE_NOTIFICATIONS_TRANSPORT=log` to silence delivery entirely.
+
+## Self-serve signup
+
+A salon registers itself at `/registrera`. The ordering is the entire design and
+is inverted from the usual one:
+
+**Registration creates nothing.** It writes one row to `provider_signup` and
+sends one link. No provider, no Cal user, no Stripe connected account. Clicking
+the link is what provisions.
+
+The common shape — create the account, mark it unverified, sweep up later — is
+easier and wrong here, because the sweeping would have to happen in systems we
+cannot sweep. A Stripe connected account created for an address nobody owns is
+not ours to delete. See ADR 0011.
+
+```bash
+curl -X POST http://localhost:8090/api/signup -H 'Content-Type: application/json' \
+  -d '{"salonName":"Klipp & Kaffe","email":"nina@example.se",
+       "password":"ett-riktigt-langt-losenord","addressLine":"Bondegatan 12",
+       "postalCode":"116 33","city":"Stockholm"}'
+# 202, always. Then read the link out of http://localhost:8026
+```
+
+Three things about it are deliberate and easy to undo by accident:
+
+- **It answers 202 whether or not the address already has an account.** Anything
+  else turns the form into a way to ask which salons are on the platform, which
+  is what the login endpoint already refuses to answer. The difference is told
+  only to the mailbox that owns the address.
+- **Rate limits are in the database, keyed on the socket address.** In memory
+  they would reset on every deploy; keyed on `X-Forwarded-For` the caller would
+  set them for themselves. Behind a proxy, set `server.forward-headers-strategy`.
+- **A failed verification leaves the link working.** The address was proved by
+  the click and does not become unproved because Stripe timed out, so
+  provisioning is resumable and a transient outage is a second click rather than
+  a support ticket.
+
+The salon ends up with two passwords — ours, which it chose, and Cal's, which is
+generated, shown once and emailed once. Different on purpose: reusing the
+console password on a third-party system would make one breach into two.
+
+```bash
+# what is in flight, and what got stuck
+docker exec -it bm-market-db psql -U market -d marketplace \
+  -c "SELECT id, email, slug, state, provider_id, attempts, failure FROM provider_signup ORDER BY id"
+```
