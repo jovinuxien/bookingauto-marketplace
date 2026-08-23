@@ -11,6 +11,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 
+import se.marketplace.categories.Categories;
+import se.marketplace.categories.Category;
+
 /**
  * The crawlable entry points.
  *
@@ -26,15 +29,32 @@ import org.springframework.http.HttpStatus;
 @Controller
 class LandingController {
 
+	/**
+	 * The category paths that have routes, as one compile-time constant.
+	 *
+	 * <p>Used in the mapping below — where it has to be a literal — and checked
+	 * against the table at startup by {@link CategoryRoutes}. The list of
+	 * categories moved into a table (ADR 0013); the list of *URLs* deliberately
+	 * did not, because the alternative is the unbounded {@code /{a}/{b}} the
+	 * comment on the mapping already rejects.
+	 *
+	 * <p>So adding a category stays a two-part deliberate act: a row in a
+	 * migration and a word here. Getting half of it done is now noticed at boot
+	 * rather than by a 404 nobody is watching.
+	 */
+	static final String CATEGORY_PATHS = "frisor|massage|hudvard";
+
 	private final LandingRepository repository;
 	private final ViteManifest manifest;
+	private final Categories categories;
 
 	@Value("${marketplace.public-url:http://localhost:8090}")
 	private String publicUrl;
 
-	LandingController(LandingRepository repository, ViteManifest manifest) {
+	LandingController(LandingRepository repository, ViteManifest manifest, Categories categories) {
 		this.repository = repository;
 		this.manifest = manifest;
+		this.categories = categories;
 	}
 
 	/**
@@ -65,12 +85,12 @@ class LandingController {
 	// The category is constrained in the pattern itself. An unbounded
 	// /{a}/{b} would sit in front of every other two-segment path in the
 	// application and quietly shadow one the day it is added.
-	@GetMapping("/{category:frisor|massage|hudvard}/{city}")
+	@GetMapping("/{category:" + CATEGORY_PATHS + "}/{city}")
 	String cityCategory(@PathVariable String category, @PathVariable String city, Model model) {
 		// Only known categories are pages. Without this every stray two-segment
 		// path becomes a thin, empty page, and a site full of those ranks worse
 		// than one without them.
-		Category resolved = Category.of(category)
+		Category resolved = categories.byPath(category)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
 		List<LandingRepository.ProviderRow> providers =
@@ -121,47 +141,6 @@ class LandingController {
 				: "Boka tid hos " + provider.name() + " i " + provider.city()
 					+ ". Lediga tider direkt från salongens kalender.");
 		return "provider";
-	}
-
-	/**
-	 * The categories that have pages.
-	 *
-	 * <p>An enum rather than a table because a category is a URL and a piece of
-	 * copy before it is data. Adding one is a deliberate act — a new indexable
-	 * page — not a row someone inserts by accident.
-	 */
-	enum Category {
-		HAR("frisor", "har", "Frisörer"),
-		MASSAGE("massage", "massage", "Massage"),
-		HUD("hudvard", "hud", "Hudvård");
-
-		private final String path;
-		private final String slug;
-		private final String label;
-
-		Category(String path, String slug, String label) {
-			this.path = path;
-			this.slug = slug;
-			this.label = label;
-		}
-
-		static java.util.Optional<Category> of(String path) {
-			return java.util.Arrays.stream(values())
-				.filter(candidate -> candidate.path.equalsIgnoreCase(path))
-				.findFirst();
-		}
-
-		public String path() {
-			return path;
-		}
-
-		public String slug() {
-			return slug;
-		}
-
-		public String label() {
-			return label;
-		}
 	}
 
 }

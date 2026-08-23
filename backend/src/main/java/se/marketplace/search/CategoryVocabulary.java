@@ -1,25 +1,37 @@
 package se.marketplace.search;
 
 import java.util.List;
+import java.util.stream.Collectors;
+
+import se.marketplace.categories.Category;
 
 /**
- * The categories that exist, read from the services that exist.
+ * The categories that exist, and the words customers use for them.
  *
- * <p>Not a constant and not a reference table, because neither would be true.
- * {@code service.category_slug} is free text filled by whatever salons imported
- * from Cal, so the only honest source for "what may be asked for" is the column
- * itself.
+ * <p>It used to be {@code SELECT DISTINCT category_slug}, which was honest
+ * about what existed and was the one-element set {@code {har}} — because every
+ * import wrote the configured default. The agent could not have proposed
+ * "massage" however plainly a customer asked for it. ADR 0013 gave the list a
+ * table; this reads it.
  *
- * <p>Its job is to be the closed set the model chooses from and is checked
- * against afterwards. Both halves matter: given the list, a model rarely
- * invents; not given it, a model asked to categorise "balayage" will confidently
- * answer {@code harfargning}, which is a plausible slug matching no row in the
- * database. See ADR 0012.
+ * <p>Its job is unchanged: be the closed set the model chooses from and is
+ * checked against afterwards. What the synonyms change is the hit rate, not the
+ * trust — {@link UnderstoodQuestion#ground} still overrules anything outside
+ * the slug list. Given the list, a model rarely invents; given the list plus
+ * "balayage", it does not have to infer either.
  */
-public record CategoryVocabulary(List<String> slugs) {
+public record CategoryVocabulary(List<Category> categories) {
+
+	static CategoryVocabulary of(List<Category> categories) {
+		return new CategoryVocabulary(categories);
+	}
+
+	List<String> slugs() {
+		return categories.stream().map(Category::slug).toList();
+	}
 
 	boolean has(String slug) {
-		return slug != null && slugs.stream().anyMatch(slug::equalsIgnoreCase);
+		return slug != null && categories.stream().anyMatch(c -> c.slug().equalsIgnoreCase(slug));
 	}
 
 	/**
@@ -31,7 +43,32 @@ public record CategoryVocabulary(List<String> slugs) {
 	 * forgiving it a category we do not have.
 	 */
 	String canonical(String slug) {
-		return slugs.stream().filter(slug::equalsIgnoreCase).findFirst().orElse(null);
+		return categories.stream()
+			.filter(c -> c.slug().equalsIgnoreCase(slug))
+			.map(Category::slug)
+			.findFirst()
+			.orElse(null);
+	}
+
+	/**
+	 * The list as the model sees it: slug, Swedish name, and what people type.
+	 *
+	 * <p>The slug leads each line because the slug is what has to come back. A
+	 * prompt that presented the label first would be asking for "Frisörer" and
+	 * then refusing it, which is a rule the grounding step would enforce
+	 * correctly and a customer would experience as us ignoring them.
+	 */
+	String forPrompt() {
+		if (categories.isEmpty()) {
+			return "(none yet)";
+		}
+
+		return categories.stream()
+			.map(category -> category.synonyms().isEmpty()
+				? category.slug() + " — " + category.label()
+				: category.slug() + " — " + category.label()
+					+ " (" + String.join(", ", category.synonyms()) + ")")
+			.collect(Collectors.joining("\n"));
 	}
 
 }

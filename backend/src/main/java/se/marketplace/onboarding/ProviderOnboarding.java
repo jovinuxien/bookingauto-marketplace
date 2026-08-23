@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import se.marketplace.onboarding.OnboardingRepository.Provider;
 import se.marketplace.payments.StripeConnectPort;
 import se.marketplace.sync.CalProvisioningPort;
+import se.marketplace.categories.Categories;
+import se.marketplace.categories.Category;
 
 /**
  * Onboarding a salon.
@@ -41,6 +43,7 @@ public class ProviderOnboarding {
 	private final OnboardingRepository repository;
 	private final CalProvisioningPort cal;
 	private final StripeConnectPort connect;
+	private final Categories categories;
 
 	@Value("${marketplace.onboarding.country:SE}")
 	private String country;
@@ -51,14 +54,25 @@ public class ProviderOnboarding {
 	@Value("${marketplace.onboarding.refresh-url:http://localhost:3000/onboarding/refresh}")
 	private String refreshUrl;
 
+	/**
+	 * Where a service goes when its name says nothing we recognise.
+	 *
+	 * <p>A real category rather than a null or an "other", because
+	 * {@code category_slug} is what every search filters on and a service in no
+	 * category is a service nobody can find. Correct for a hairdressing
+	 * marketplace today, and quietly wrong the first time a massage-only salon
+	 * onboards — ADR 0013 records that as a watch item rather than pretending
+	 * otherwise.
+	 */
 	@Value("${marketplace.onboarding.default-category:har}")
 	private String defaultCategory;
 
 	ProviderOnboarding(OnboardingRepository repository, CalProvisioningPort cal,
-		StripeConnectPort connect) {
+		StripeConnectPort connect, Categories categories) {
 		this.repository = repository;
 		this.cal = cal;
 		this.connect = connect;
+		this.categories = categories;
 	}
 
 	/**
@@ -190,8 +204,16 @@ public class ProviderOnboarding {
 				continue;
 			}
 
+			// Classified from the title rather than defaulted. Every service this
+			// system had ever imported was 'har', because this line used to write
+			// the default unconditionally -- which is why /massage/{city} and
+			// /hudvard/{city} could not exist. See ADR 0013.
+			String category = categories.classify(eventType.title())
+				.map(Category::slug)
+				.orElse(defaultCategory);
+
 			repository.importService(providerId, eventType.id(), eventType.title(),
-				defaultCategory, eventType.lengthMinutes(),
+				category, eventType.lengthMinutes(),
 				eventType.priceMinor(), currencyOf(eventType));
 			imported.add(eventType.title());
 		}

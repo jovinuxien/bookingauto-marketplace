@@ -148,11 +148,15 @@ untouched by any of this.
   in front of it is two orders of magnitude slower. `/api/search/ask` is a
   separate endpoint from `/api/search` partly so this is measurable rather than
   averaged into the number we already have.
-- **The vocabulary is one column of free text.** `service.category_slug` has no
-  reference table and `onboarding` defaults it to `har`. Grounding against
-  `SELECT DISTINCT` works and is honest about what exists, but it means the
-  vocabulary is whatever salons happened to import. That is a data-model
-  question worth answering on its own terms, and this ADR does not answer it.
+- ~~The vocabulary is one column of free text.~~ **Answered by ADR 0013**, and
+  the answer was worse than this entry guessed. Grounding against
+  `SELECT DISTINCT` was honest about what existed, and what existed was the
+  one-element set `{har}` — every service in the system, because `onboarding`
+  wrote the default for every import. The agent could not have proposed massage
+  however plainly it was asked. It now reads a `service_category` table with
+  Swedish labels and the words customers type, and the grounding step is
+  unchanged: synonyms make the model right more often, they do not make it
+  trusted.
 - **Kotlin throws checked exceptions through Java signatures.** A failed model
   call arrives as `java.util.concurrent.ExecutionException` — checked — from a
   method that declares nothing, so the original `catch (RuntimeException)`

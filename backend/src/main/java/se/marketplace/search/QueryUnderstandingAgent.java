@@ -10,11 +10,8 @@ import com.embabel.agent.api.annotation.Agent;
 import com.embabel.agent.api.common.OperationContext;
 import com.embabel.agent.api.common.PromptRunner;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
-
 import se.marketplace.ai.AiGate;
+import se.marketplace.categories.Categories;
 
 /**
  * Reads a sentence and produces filter parameters. Nothing else.
@@ -42,39 +39,26 @@ import se.marketplace.ai.AiGate;
 	description = "Turns a customer's free-text search into geo and availability filters")
 class QueryUnderstandingAgent {
 
-	/**
-	 * Ordered by how many services carry the category, so that a marketplace
-	 * with a long tail of one-off slugs truncates the tail rather than the head.
-	 * The cap exists because this list goes into a prompt on the search path and
-	 * an unbounded one is an unbounded bill.
-	 */
-	private static final String VOCABULARY = """
-		SELECT s.category_slug
-		  FROM service s
-		  JOIN provider p ON p.id = s.provider_id
-		 WHERE s.active AND p.status = 'active'
-		 GROUP BY s.category_slug
-		 ORDER BY count(*) DESC, s.category_slug
-		 LIMIT :limit
-		""";
-
-	private final NamedParameterJdbcTemplate jdbc;
+	private final Categories categories;
 	private final AiGate gate;
 
-	@Value("${marketplace.ai.vocabulary-limit:200}")
-	private int vocabularyLimit;
-
-	QueryUnderstandingAgent(NamedParameterJdbcTemplate jdbc, AiGate gate) {
-		this.jdbc = jdbc;
+	QueryUnderstandingAgent(Categories categories, AiGate gate) {
+		this.categories = categories;
 		this.gate = gate;
 	}
 
-	@Action(description = "Read the categories salons actually sell", readOnly = true)
+	/**
+	 * The closed set, read from the one place it is written down.
+	 *
+	 * <p>This was {@code SELECT DISTINCT category_slug} until ADR 0013, which is
+	 * a different question with the same shape and a much worse answer: it
+	 * returned what salons happened to have been assigned, which was
+	 * {@code {har}} for every service in the system, so the agent could not have
+	 * proposed massage however plainly it was asked for.
+	 */
+	@Action(description = "Read the categories the marketplace sells", readOnly = true)
 	CategoryVocabulary vocabulary(AskedQuestion question) {
-		List<String> slugs = jdbc.queryForList(
-			VOCABULARY, new MapSqlParameterSource("limit", vocabularyLimit), String.class);
-
-		return new CategoryVocabulary(slugs);
+		return CategoryVocabulary.of(categories.all());
 	}
 
 	@Action(description = "Read the customer's sentence as filters")
@@ -129,8 +113,10 @@ class QueryUnderstandingAgent {
 
 			Today is %s, a %s. Times are Europe/Stockholm.
 
-			These are the only categories that exist. Choose one exactly as
-			spelled, or leave it blank:
+			These are the only categories that exist. Answer with a slug —
+			the word before the dash — exactly as spelled, or leave it blank.
+			The name after the dash is what we call it and the words in
+			brackets are what customers call it:
 
 			%s
 
@@ -153,7 +139,7 @@ class QueryUnderstandingAgent {
 				question.text(),
 				question.today(),
 				question.today().getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH),
-				vocabulary.slugs().isEmpty() ? "(none yet)" : String.join("\n", vocabulary.slugs()));
+				vocabulary.forPrompt());
 	}
 
 }

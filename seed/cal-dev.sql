@@ -43,17 +43,28 @@ update users u
  where s."userId" = u.id
    and u."defaultScheduleId" is null;
 
--- The bookable thing. 45 minutes to match service.duration_minutes on the
--- marketplace side; a mismatch there would make the index describe slots
--- of a length Cal will not sell.
+-- The bookable things. Lengths match service.duration_minutes on the
+-- marketplace side; a mismatch there would make the index describe slots of a
+-- length Cal will not sell.
+--
+-- The massage is not decoration. Until ADR 0013 every imported service was
+-- categorised 'har', so /massage/{city} and /hudvard/{city} could not exist --
+-- and a fixture that only ever produces hairdressing is a fixture that cannot
+-- notice. One salon selling something else is what makes the second landing
+-- page, the category filter and the import classifier exercisable at all.
 insert into "EventType" (title, slug, length, "userId", "scheduleId", price, currency,
                          "requiresConfirmation", "requiresConfirmationWillBlockSlot")
-select 'Färgning 45 min', 'fargning-45', 45, u.id, u."defaultScheduleId", 0, 'sek', false, false
-  from users u
- where u.username in ('salong-sodermalm', 'klinik-vasastan', 'goteborg-harstudio')
-   and not exists (
+select w.title, w.slug, w.length, u.id, u."defaultScheduleId", 0, 'sek', false, false
+  from (values
+          ('salong-sodermalm',   'fargning-45', 'Färgning 45 min', 45),
+          ('klinik-vasastan',    'fargning-45', 'Färgning 45 min', 45),
+          ('goteborg-harstudio', 'fargning-45', 'Färgning 45 min', 45),
+          ('klinik-vasastan',    'massage-60',  'Massage 60 min',  60)
+       ) as w(username, slug, title, length)
+  join users u on u.username = w.username
+ where not exists (
          select 1 from "EventType" e
-          where e."userId" = u.id and e.slug = 'fargning-45');
+          where e."userId" = u.id and e.slug = w.slug);
 
 -- Auto-accepting on purpose. Both confirmation flags are OFF, and that is a
 -- decision worth understanding before flipping it.
@@ -82,7 +93,7 @@ select 'Färgning 45 min', 'fargning-45', 45, u.id, u."defaultScheduleId", 0, 's
 update "EventType"
    set "requiresConfirmation" = false,
        "requiresConfirmationWillBlockSlot" = false
- where slug = 'fargning-45';
+ where slug in ('fargning-45', 'massage-60');
 
 -- EventType."userId" is only the OWNER. Cal resolves who can actually be
 -- booked through the _user_eventtype join table, and an event type absent
@@ -91,7 +102,7 @@ update "EventType"
 insert into "_user_eventtype" ("A", "B")
 select e.id, e."userId"
   from "EventType" e
- where e.slug = 'fargning-45'
+ where e.slug in ('fargning-45', 'massage-60')
    and not exists (
          select 1 from "_user_eventtype" j
           where j."A" = e.id and j."B" = e."userId");

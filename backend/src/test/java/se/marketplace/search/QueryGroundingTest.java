@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.LocalDate;
 import java.util.List;
 
+import se.marketplace.categories.Category;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -25,8 +27,18 @@ class QueryGroundingTest {
 
 	private static final LocalDate TODAY = LocalDate.of(2026, 8, 22);
 
-	private static final CategoryVocabulary VOCABULARY =
-		new CategoryVocabulary(List.of("har", "massage", "hudvard"));
+	/**
+	 * The three that are actually seeded, with their real slugs.
+	 *
+	 * <p>{@code hud}, not {@code hudvard} — {@code hudvard} is the URL segment
+	 * and {@code hud} is what {@code service.category_slug} holds. This test
+	 * originally used the path as though it were the slug, which is the same
+	 * confusion that once pointed every landing canonical at a URL that 404s.
+	 */
+	private static final CategoryVocabulary VOCABULARY = new CategoryVocabulary(List.of(
+		new Category("har", "frisor", "Frisörer", List.of("klippning", "balayage"), 10),
+		new Category("massage", "massage", "Massage", List.of("massage"), 20),
+		new Category("hud", "hudvard", "Hudvård", List.of("ansiktsbehandling"), 30)));
 
 	private static AskedQuestion asked() {
 		return new AskedQuestion("balayage på lördag", 59.32, 18.06, 5000, TODAY, 14, 20);

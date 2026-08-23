@@ -30,6 +30,41 @@ test.describe('landing pages', () => {
     await expect(page.getByText('Sidan finns inte')).toHaveCount(0);
   });
 
+  test('a second category is a second page, not the same one', async ({ page }) => {
+    // Until ADR 0013 every service in the system was categorised 'har', so this
+    // page could not exist and its absence was invisible: cityCategory 404s when
+    // a category has no salons, and the sitemap correctly omits what 404s. Two
+    // of the three page types this site was built to rank for were unreachable
+    // and every signal said everything was fine.
+    await page.goto('/massage/stockholm');
+
+    await expect(page.getByRole('heading', { name: /Massage i Stockholm/ })).toBeVisible();
+    await expect(page.getByText('Sidan finns inte')).toHaveCount(0);
+
+    // And the listing is genuinely scoped to the category rather than the hair
+    // page with a new heading. Klinik Vasastan sells both, so it appears on
+    // both pages -- what differs is the price, which comes from the services
+    // the category actually matched: 850 kr for the massage, 600 for the
+    // colour. A providersIn that ignored its category argument would show 600
+    // here and pass every other assertion on the page.
+    await expect(page.getByText('Från 850 SEK')).toBeVisible();
+    await expect(page.getByText('Från 600 SEK')).toHaveCount(0);
+
+    // Only the salon that sells it. The other two Stockholm salons are on the
+    // hair page and have no business being on this one.
+    await expect(page.getByRole('link', { name: 'Klinik Vasastan' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Salong Östermalm' })).toHaveCount(0);
+  });
+
+  test('a category nobody sells is still a 404', async ({ page }) => {
+    // The route exists and the category is seeded; what is missing is a salon.
+    // A thin page here would be worse than no page — a site full of empty
+    // category pages ranks below one without them, which is the whole reason
+    // cityCategory 404s on an empty result.
+    const response = await page.goto('/hudvard/stockholm');
+    expect(response?.status()).toBe(404);
+  });
+
   test('a closed day says so rather than showing nothing', async ({ page }) => {
     // The empty state is a real answer, not a failure, and it is what the whole
     // suite tripped over first: the salons are shut at weekends.

@@ -1,12 +1,15 @@
 package se.marketplace.landing;
 
-import java.util.stream.Collectors;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import se.marketplace.categories.Categories;
+import se.marketplace.categories.Category;
 
 /**
  * Tells a crawler which pages exist.
@@ -23,12 +26,14 @@ import org.springframework.web.bind.annotation.RestController;
 class SitemapController {
 
 	private final LandingRepository repository;
+	private final Categories categories;
 
 	@Value("${marketplace.public-url:http://localhost:8090}")
 	private String publicUrl;
 
-	SitemapController(LandingRepository repository) {
+	SitemapController(LandingRepository repository, Categories categories) {
 		this.repository = repository;
+		this.categories = categories;
 	}
 
 	@GetMapping(value = "/sitemap.xml", produces = MediaType.APPLICATION_XML_VALUE)
@@ -42,8 +47,10 @@ class SitemapController {
 		// One page per category per city that actually has salons. Emitting
 		// combinations with nothing behind them would fill the index with thin
 		// pages, which costs more than the extra URLs are worth.
+		List<Category> active = categories.all();
+
 		for (LandingRepository.CityRow city : repository.cities()) {
-			for (LandingController.Category category : LandingController.Category.values()) {
+			for (Category category : active) {
 				if (!repository.providersIn(city.slug(), category.slug()).isEmpty()) {
 					url(xml, publicUrl + "/" + category.path() + "/" + city.slug(), "0.9");
 				}

@@ -180,9 +180,36 @@ API without anything hand-written in between:
   with the gate off and again with a deliberately invalid key: the box appears,
   the sentence submits, the Swedish note renders, no error, and the results are
   the ones the plain search would have given
-- 105 tests and 20 browser tests
+- **Categories are a table, and the marketplace sells more than hair.** Every
+  service this system had ever imported was `har`, because the import wrote the
+  configured default for every event type — so `/massage/{city}` and
+  `/hudvard/{city}` were pages that could not exist, and the sitemap correctly
+  omitted what 404s, which is exactly why nobody noticed. `service_category`
+  now holds the slug, the URL path, the Swedish label and the words customers
+  actually type; `service.category_slug` has a foreign key to it; and the
+  import classifies from the event type's title instead of defaulting. The
+  agent's prompt is the same list, so "balayage" is a lookup rather than a
+  guess — and the grounding step still overrules it against the slugs. Verified
+  end to end: `/massage/stockholm` renders "Massage i Stockholm" at 850 kr
+  where the hair page shows 600, `/hudvard/stockholm` is still a 404 because
+  nobody sells it, the sitemap lists both real pages, and
+  `?category=massage` returns one salon where `?category=har` returns three.
+  See ADR 0013
+- 117 tests and 22 browser tests
 
 Sketch:
+
+- **Nothing tests the seed, and it had been broken for a while.**
+  `seed/dev.sql` inserted providers
+  as `active` with no Stripe account, which `provider_sellable_check` has
+  forbidden since db/004 — and `ON CONFLICT` does not save it, because a CHECK
+  is evaluated before conflict arbitration. It also wrote Cal event type ids as
+  literal 1, 2, 3, which holds only on a Cal nobody has onboarded into; any
+  import takes those ids first and the fixture then points its services at
+  someone else's event types, which Cal answers with an empty slot map and no
+  error. Both are fixed — the ids are read back from Cal, and the fixture
+  satisfies the invariant rather than routing around it — but both were found by
+  running it, and nothing would catch the next one
 
 - **No model has ever answered.** The path is proven as far as the API boundary
   — with the gate on and a deliberately invalid key, a real Swedish sentence
@@ -225,7 +252,8 @@ docs/design/           booking-funnel.md — the saga, stage by stage
 backend/               Spring Modulith: search, sync, booking, payments,
                        onboarding, console, signup, landing, notifications, geo,
                        ai (whether a model may be called; no agents live there),
-                       ratelimit (a bucket, a window and a count)
+                       ratelimit (a bucket, a window and a count),
+                       categories (what a salon sells, and its URL)
   src/main/webapp/app/ React SPA — config/, shared/, modules/; built into the jar
 ```
 

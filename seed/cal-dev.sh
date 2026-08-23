@@ -29,8 +29,35 @@ done
 echo "seeding cal schedules and event types"
 docker exec -i bm-cal-db psql -q -U cal -d calendso -v ON_ERROR_STOP=1 < seed/cal-dev.sql
 
+# Event type ids are read back from Cal rather than assumed.
+#
+# They were written into dev.sql as 1, 2, 3 -- which holds only on a Cal that
+# has never been used for anything else. Any onboarding import takes those ids
+# first, and the fixture then points its services at event types belonging to
+# somebody else. Cal answers with an empty slot map and no error, which reads
+# exactly like a salon with nothing free, so the fixture would look seeded and
+# search would look broken.
+event_type_id() {
+  local username="$1" slug="$2" id
+  id=$(docker exec bm-cal-db psql -tAq -U cal -d calendso -c \
+    "select e.id from \"EventType\" e join users u on u.id = e.\"userId\"
+      where u.username = '$username' and e.slug = '$slug' order by e.id limit 1")
+
+  if [ -z "$id" ]; then
+    echo "no event type '$slug' for $username -- cal-dev.sql did not create it" >&2
+    exit 1
+  fi
+
+  printf '%s' "$id"
+}
+
 echo "seeding marketplace providers and services"
-docker exec -i bm-market-db psql -q -U market -d marketplace -v ON_ERROR_STOP=1 < seed/dev.sql
+docker exec -i bm-market-db psql -q -U market -d marketplace -v ON_ERROR_STOP=1 \
+  -v et_sodermalm_fargning="$(event_type_id salong-sodermalm fargning-45)" \
+  -v et_vasastan_fargning="$(event_type_id klinik-vasastan fargning-45)" \
+  -v et_goteborg_fargning="$(event_type_id goteborg-harstudio fargning-45)" \
+  -v et_vasastan_massage="$(event_type_id klinik-vasastan massage-60)" \
+  < seed/dev.sql
 
 echo
 echo "done. Start the backend and the reconciler will fill availability_day."
