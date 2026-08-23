@@ -18,7 +18,12 @@ import org.springframework.modulith.Modulithic;
  */
 @Modulithic(
 	systemName = "booking-marketplace",
-	sharedModules = {}
+	// 'ai' only. It holds whether a model may be called at all, which every
+	// module that ever grows an agent needs and none of them should have to
+	// declare a dependency on to say so. Nothing else is shared: the point of
+	// the boundaries is that a dependency is stated, and a shared module is a
+	// dependency nobody states.
+	sharedModules = { "ai" }
 )
 @org.springframework.scheduling.annotation.EnableScheduling
 @SpringBootApplication

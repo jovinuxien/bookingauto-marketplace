@@ -145,7 +145,30 @@ API without anything hand-written in between:
   placement then outranks the sweep permanently
 - 84 tests
 
+- **Search takes a sentence.** `/api/search/ask` puts an Embabel agent in front
+  of the same PostGIS query: it reads the categories that actually exist, asks a
+  model to read the text against that closed set, and then checks the answer —
+  a category we do not have, a date in the past or past the index horizon, a
+  part of day that is not one of ours are each dropped and named in the
+  response. The plan is three steps and only the middle one is a model, so what
+  reaches SQL is decided by ordinary Java. Verified: on Spring Boot 3.5 with the
+  gate off and no API key, the backend starts, `/api/search/ask` answers 200
+  with the plain geo query and the two Stockholm salons at 911 m and 2300 m, and
+  `/api/search` is byte-for-byte unchanged. See ADR 0012, which lists what an
+  agent may never do
+- 97 tests
+
 Sketch:
+
+- **The model half of `/api/search/ask` has never run.** Everything around it
+  has — the grounding rules have 13 tests, the fallback is exercised, the
+  application starts without a key — but no sentence has been sent to Anthropic
+  from this codebase. Set `ANTHROPIC_API_KEY` and `MARKETPLACE_AI_ENABLED=true`
+  and the first real query is the first proof
+- **`/api/search/ask` is public, anonymous and metered, and has no rate limit.**
+  That combination is exactly what ADR 0011 refused to ship for signup. It is
+  survivable only because the endpoint is off by default; a deployment that
+  turns it on needs the counter first
 
 - Stripe is exercised only against `stripe-mock`, which validates request shape
   and nothing else. Real Swish redirection, webhook signatures, Connect
@@ -176,7 +199,8 @@ seed/                  dev fixtures — cal-dev.sh seeds both sides
 docs/decisions/        ADRs — why, not what
 docs/design/           booking-funnel.md — the saga, stage by stage
 backend/               Spring Modulith: search, sync, booking, payments,
-                       onboarding, console, signup, landing, notifications, geo
+                       onboarding, console, signup, landing, notifications, geo,
+                       ai (whether a model may be called; no agents live there)
   src/main/webapp/app/ React SPA — config/, shared/, modules/; built into the jar
 ```
 

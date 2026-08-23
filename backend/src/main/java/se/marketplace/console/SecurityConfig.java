@@ -90,6 +90,14 @@ class SecurityConfig {
 				// Requiring an account to see availability would cost more
 				// bookings than it could ever protect.
 				.requestMatchers(HttpMethod.GET, "/api/search").permitAll()
+				// Free-text search. Listed separately from /api/search rather
+				// than widened to /api/search/** because this one costs money
+				// per call, and a wildcard would silently enrol anything added
+				// under that path later. Off by default (ADR 0012); before a
+				// deployment turns it on it needs a rate limit, for the reason
+				// ADR 0011 gives about signup — an endpoint worth attacking is
+				// one where each attempt is cheap for the caller and not for us.
+				.requestMatchers(HttpMethod.GET, "/api/search/ask").permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/providers/*").permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/services/*/slots").permitAll()
 				.requestMatchers(HttpMethod.POST, "/api/bookings").permitAll()

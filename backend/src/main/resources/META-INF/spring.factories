@@ -1,0 +1,5 @@
+# Runs before the context refreshes, which is the only moment early enough to
+# stop Embabel's Anthropic auto-configuration throwing on a machine with no API
+# key. See se.marketplace.ai.ModelsOnlyWhenConfigured.
+org.springframework.boot.env.EnvironmentPostProcessor=\
+  se.marketplace.ai.ModelsOnlyWhenConfigured

@@ -1,6 +1,12 @@
 spring:
   application:
     name: booking-marketplace
+  ai:
+    # Read only when marketplace.ai.enabled is true, but declared with a blank
+    # default so an absent key is a feature that stays off rather than a
+    # backend that will not start.
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY:}
   mail:
     host: ${MAIL_HOST:localhost}
     port: ${MAIL_PORT:1026}
@@ -103,6 +109,30 @@ marketplace:
     expiry-sweep-ms: ${MARKETPLACE_SIGNUP_EXPIRY_SWEEP_MS:900000}
     rate-sweep-ms: ${MARKETPLACE_SIGNUP_RATE_SWEEP_MS:3600000}
 
+  # Agents. Off, and that is the default a deployment has to override
+  # deliberately -- this is the first dependency billed per request rather than
+  # per month, sitting in front of the endpoint customers hit most. Same
+  # reasoning as geocoding.provider below, with an invoice instead of a usage
+  # policy. See ADR 0012 for what an agent is allowed to decide, which is a
+  # much shorter list than what it is capable of.
+  ai:
+    enabled: ${MARKETPLACE_AI_ENABLED:false}
+
+    # Blank accepts embabel.models.default-llm. Named separately because query
+    # interpretation is extraction rather than judgement and runs on the search
+    # path, so it is the one place where the cheapest capable model is not a
+    # compromise.
+    interpretation-model: ${MARKETPLACE_AI_INTERPRETATION_MODEL:}
+
+    # A search box is not a text area. Longer arrivals are answered with the
+    # plain geo query rather than sent to a model.
+    max-query-length: ${MARKETPLACE_AI_MAX_QUERY_LENGTH:200}
+
+    # How many category slugs go into the prompt, most-used first. The column is
+    # free text with no reference table, so this is a bound on a list nobody
+    # controls.
+    vocabulary-limit: ${MARKETPLACE_AI_VOCABULARY_LIMIT:200}
+
   geocoding:
     # 'none' by default, and that is not laziness. Enabling a geocoder by
     # default would point every developer machine and every CI run at a public
@@ -155,3 +185,11 @@ server:
 logging:
   level:
     se.marketplace: DEBUG
+
+# The agent platform. Nothing here is read unless marketplace.ai.enabled is
+# true, but the key has to be absent-safe regardless: a backend that will not
+# start without an API key would make an optional feature a deployment
+# requirement.
+embabel:
+  models:
+    default-llm: ${MARKETPLACE_AI_DEFAULT_MODEL:claude-haiku-4-5}
