@@ -107,7 +107,6 @@ marketplace:
     verify-per-ip-per-hour: ${MARKETPLACE_SIGNUP_VERIFY_PER_IP_PER_HOUR:30}
 
     expiry-sweep-ms: ${MARKETPLACE_SIGNUP_EXPIRY_SWEEP_MS:900000}
-    rate-sweep-ms: ${MARKETPLACE_SIGNUP_RATE_SWEEP_MS:3600000}
 
   # Agents. Off, and that is the default a deployment has to override
   # deliberately -- this is the first dependency billed per request rather than
@@ -128,10 +127,23 @@ marketplace:
     # plain geo query rather than sent to a model.
     max-query-length: ${MARKETPLACE_AI_MAX_QUERY_LENGTH:200}
 
+    # Interpreted searches per hour, per source address. Much higher than the
+    # signup limits and deliberately so: those defend accounts at Cal and
+    # Stripe, where being wrong is not ours to undo, and this defends an
+    # invoice. Being over it is not a lockout -- the search still runs, just
+    # without the sentence having been read -- so it can afford to be generous
+    # to an office or a carrier NAT sharing one address.
+    ask-per-ip-per-hour: ${MARKETPLACE_AI_ASK_PER_IP_PER_HOUR:60}
+
     # How many category slugs go into the prompt, most-used first. The column is
     # free text with no reference table, so this is a bound on a list nobody
     # controls.
     vocabulary-limit: ${MARKETPLACE_AI_VOCABULARY_LIMIT:200}
+
+  # Shared by every module that limits something. The sweep is here rather than
+  # under whichever module happened to need a counter first.
+  ratelimit:
+    sweep-ms: ${MARKETPLACE_RATELIMIT_SWEEP_MS:3600000}
 
   geocoding:
     # 'none' by default, and that is not laziness. Enabling a geocoder by

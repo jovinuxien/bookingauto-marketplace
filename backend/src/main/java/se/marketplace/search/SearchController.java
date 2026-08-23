@@ -4,6 +4,8 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -84,10 +86,16 @@ class SearchController {
 		@RequestParam double lat,
 		@RequestParam double lon,
 		@RequestParam(defaultValue = "5000") int radius,
-		@RequestParam(defaultValue = "20") int limit) {
+		@RequestParam(defaultValue = "20") int limit,
+		HttpServletRequest request) {
 
-		UnderstoodQuestion understood = understanding.of(new AskedQuestion(
-			q, lat, lon, radius, LocalDate.now(ZoneId.of(timezone)), horizonDays, limit));
+		// getRemoteAddr, not X-Forwarded-For. Behind a proxy the fix is
+		// server.forward-headers-strategy, which is a deployment decision;
+		// trusting the header here would let every caller pick their own bucket.
+		UnderstoodQuestion understood = understanding.of(
+			new AskedQuestion(
+				q, lat, lon, radius, LocalDate.now(ZoneId.of(timezone)), horizonDays, limit),
+			request.getRemoteAddr());
 
 		return AskedAnswer.of(understood, search.nearby(understood.request()));
 	}

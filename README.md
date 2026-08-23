@@ -156,19 +156,33 @@ API without anything hand-written in between:
   with the plain geo query and the two Stockholm salons at 911 m and 2300 m, and
   `/api/search` is byte-for-byte unchanged. See ADR 0012, which lists what an
   agent may never do
-- 97 tests
+- **Interpreted search is rate limited**, at 60 per hour per socket address.
+  Over the limit is not a 429 — the search runs unfiltered, because what is
+  being protected is an invoice rather than a resource. The counter is the one
+  `signup` was already using; a second caller is what moved it into its own
+  module. Verified with the limit set to 1 and a deliberately invalid API key:
+  the first call reaches Anthropic and comes back 200 with `"we could not read
+  that"`, the second and third are refused and come back 200 with the same
+  salons, and the counter still increments on a refusal, so hammering the
+  endpoint cannot reset the window
+- **Every failure of the model is still a search.** A bad key returned HTTP 500
+  before this was true: Embabel is Kotlin, and a failed call arrives as a
+  *checked* `ExecutionException` through a signature that declares nothing, so
+  `catch (RuntimeException)` compiled and missed it. The invocation now sits
+  behind a seam declared `throws Exception`, which makes the compiler insist
+- 105 tests
 
 Sketch:
 
-- **The model half of `/api/search/ask` has never run.** Everything around it
-  has — the grounding rules have 13 tests, the fallback is exercised, the
-  application starts without a key — but no sentence has been sent to Anthropic
-  from this codebase. Set `ANTHROPIC_API_KEY` and `MARKETPLACE_AI_ENABLED=true`
-  and the first real query is the first proof
-- **`/api/search/ask` is public, anonymous and metered, and has no rate limit.**
-  That combination is exactly what ADR 0011 refused to ship for signup. It is
-  survivable only because the endpoint is off by default; a deployment that
-  turns it on needs the counter first
+- **No model has ever answered.** The path is proven as far as the API boundary
+  — with the gate on and a deliberately invalid key, a real Swedish sentence
+  reaches `api.anthropic.com`, is rejected 401, and comes back to the customer
+  as results — so the wiring, the retry, the counter and the fallback are all
+  exercised. What has never happened is a model reading the sentence and the
+  grounding step overruling it on live output. The 13 grounding tests use
+  hand-written interpretations, which proves the rules and not the prompt. Set a
+  real `ANTHROPIC_API_KEY` with `MARKETPLACE_AI_ENABLED=true` and the first
+  query is the first proof
 
 - Stripe is exercised only against `stripe-mock`, which validates request shape
   and nothing else. Real Swish redirection, webhook signatures, Connect
@@ -200,7 +214,8 @@ docs/decisions/        ADRs — why, not what
 docs/design/           booking-funnel.md — the saga, stage by stage
 backend/               Spring Modulith: search, sync, booking, payments,
                        onboarding, console, signup, landing, notifications, geo,
-                       ai (whether a model may be called; no agents live there)
+                       ai (whether a model may be called; no agents live there),
+                       ratelimit (a bucket, a window and a count)
   src/main/webapp/app/ React SPA — config/, shared/, modules/; built into the jar
 ```
 

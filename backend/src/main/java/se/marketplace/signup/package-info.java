@@ -24,5 +24,5 @@
  */
 @org.springframework.modulith.ApplicationModule(
 	displayName = "Signup",
-	allowedDependencies = { "onboarding", "console", "notifications" })
+	allowedDependencies = { "onboarding", "console", "notifications", "ratelimit" })
 package se.marketplace.signup;

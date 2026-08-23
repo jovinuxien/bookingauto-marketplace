@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import se.marketplace.notifications.SignupNotifier;
+import se.marketplace.ratelimit.RateLimiter;
 
 /**
  * A salon registering itself, in two halves separated by an email.

@@ -6,5 +6,11 @@
  * shape with opposite churn characteristics and is deferred to OCSS behind
  * {@link se.marketplace.search.SearchPort}. See ADR 0006.
  */
-@org.springframework.modulith.ApplicationModule(displayName = "Search")
+@org.springframework.modulith.ApplicationModule(
+	displayName = "Search",
+	// Declared now that /api/search/ask calls a metered model. Search had no
+	// list before because it needed nothing; an empty list and an unstated one
+	// look identical from here, and this endpoint is one whose exposure should
+	// be written down rather than inferred.
+	allowedDependencies = { "ratelimit" })
 package se.marketplace.search;

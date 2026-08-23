@@ -136,14 +136,14 @@ untouched by any of this.
 
 ## Watch items
 
-- **`/api/search/ask` has no rate limit, and needs one before it is enabled
-  anywhere real.** It is public, anonymous, and costs us money per call — the
-  same three properties that made `POST /api/providers` unshippable in ADR 0011,
-  minus the part where the damage happens at another company. The gate being off
-  by default is what makes shipping it in this state defensible, and it is not
-  what makes it safe. The signup limiter is the model to copy and cannot be
-  reused directly: it lives in `signup` and search has no business depending on
-  it.
+- ~~`/api/search/ask` has no rate limit.~~ **Done.** 60 interpreted searches per
+  hour per socket address, counted by the limiter that moved out of `signup`
+  into its own module the moment it had a second caller. Over the limit is not
+  a 429: the search still runs, unfiltered, because what is being protected here
+  is an invoice rather than a resource, and the customer is still owed the
+  salons. That is also why the number can be generous where ADR 0011's had to be
+  small — signup was defending accounts at Cal and Stripe, where being wrong is
+  not ours to undo.
 - **Latency.** Search is currently a single indexed PostGIS query. An LLM call
   in front of it is two orders of magnitude slower. `/api/search/ask` is a
   separate endpoint from `/api/search` partly so this is measurable rather than
@@ -153,6 +153,14 @@ untouched by any of this.
   `SELECT DISTINCT` works and is honest about what exists, but it means the
   vocabulary is whatever salons happened to import. That is a data-model
   question worth answering on its own terms, and this ADR does not answer it.
+- **Kotlin throws checked exceptions through Java signatures.** A failed model
+  call arrives as `java.util.concurrent.ExecutionException` — checked — from a
+  method that declares nothing, so the original `catch (RuntimeException)`
+  compiled, read as thorough, and produced HTTP 500 from the one endpoint whose
+  whole design is that it cannot fail. Found by running it with a bogus key. The
+  invocation now sits behind a seam declared `throws Exception` so the compiler
+  insists on the catch that holds; assume the same trap anywhere else this
+  codebase calls into Embabel.
 - **This is not OCSS.** No ranking, no typeahead, no synonym rules, no index.
   When there are query logs, ADR 0006's phase two is still the answer to the
   problem it describes — and the queries logged here are how we get them.

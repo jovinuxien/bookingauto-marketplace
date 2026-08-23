@@ -1,4 +1,4 @@
-package se.marketplace.signup;
+package se.marketplace.ratelimit;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -17,8 +17,14 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>A fixed-window counter in the database. In memory would be faster and
  * would reset on every deploy, which on a machine that deploys often is
- * indistinguishable from not having one — and this is the surface where the
- * cost of being wrong is paid to Stripe and to Cal rather than to us.
+ * indistinguishable from not having one, and would not survive a second
+ * instance either.
+ *
+ * <p>It lived in {@code signup} until search needed one too. Nothing about it
+ * was ever signup-specific — {@code rate_limit} has always been a bucket, a
+ * window and a count — and a second caller is what turns a private helper into
+ * infrastructure. The alternative was a second copy of this SQL and a second
+ * sweep, which is how two limiters end up disagreeing about what an hour is.
  *
  * <p>The window is fixed rather than sliding, which means a caller who waits
  * for a boundary can get two windows' worth back to back. That is understood.
@@ -27,13 +33,13 @@ import org.springframework.transaction.annotation.Transactional;
  * nothing here needs.
  */
 @Component
-class RateLimiter {
+public class RateLimiter {
 
 	private static final Logger log = LoggerFactory.getLogger(RateLimiter.class);
 
 	private final NamedParameterJdbcTemplate jdbc;
 
-	RateLimiter(NamedParameterJdbcTemplate jdbc) {
+	public RateLimiter(NamedParameterJdbcTemplate jdbc) {
 		this.jdbc = jdbc;
 	}
 
@@ -50,7 +56,7 @@ class RateLimiter {
 	 * fail.
 	 */
 	@Transactional(propagation = Propagation.REQUIRES_NEW)
-	boolean allow(String bucket, int limit, Duration window) {
+	public boolean allow(String bucket, int limit, Duration window) {
 		Instant windowStart = Instant.ofEpochSecond(
 			Instant.now().getEpochSecond() / window.toSeconds() * window.toSeconds());
 
@@ -82,7 +88,7 @@ class RateLimiter {
 	 * window passes, so without this it is the fastest growing table in the
 	 * database and the least interesting.
 	 */
-	@Scheduled(fixedDelayString = "${marketplace.signup.rate-sweep-ms:3600000}")
+	@Scheduled(fixedDelayString = "${marketplace.ratelimit.sweep-ms:3600000}")
 	@Transactional
 	void sweep() {
 		int removed = jdbc.update(

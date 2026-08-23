@@ -22,6 +22,7 @@ import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import se.marketplace.notifications.SignupNotifier;
+import se.marketplace.ratelimit.RateLimiter;
 
 /**
  * The two claims this module is built on.
@@ -562,7 +563,7 @@ class SelfServeSignupTest {
 		}
 
 		@Override
-		boolean allow(String bucket, int limit, java.time.Duration window) {
+		public boolean allow(String bucket, int limit, java.time.Duration window) {
 			counted.add(bucket);
 			return limits.getOrDefault(bucket, Integer.MAX_VALUE) > 0;
 		}
