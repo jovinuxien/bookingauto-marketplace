@@ -31,6 +31,12 @@ public record UnderstoodQuestion(
 	 * What was in the interpretation and did not survive, in words. Returned to
 	 * the caller rather than logged: a filter that was silently discarded is as
 	 * invisible as one that was silently applied.
+	 *
+	 * <p>Swedish, because it is rendered on a Swedish page next to a summary the
+	 * model was asked to write in the customer's own language. The precedent is
+	 * already here — the landing pages and the outbox's emails are Swedish — and
+	 * an English sentence in the middle of them would be a developer's note that
+	 * escaped onto the page.
 	 */
 	List<String> ignored
 ) {
@@ -79,7 +85,7 @@ public record UnderstoodQuestion(
 			// Named rather than counted. An operator reading these is looking at
 			// the gap between what customers ask for and what salons imported,
 			// and the slug the model reached for is the useful half of that.
-			ignored.add("we have no category called '" + proposed.strip() + "'");
+			ignored.add("Vi har ingen kategori som heter ”" + proposed.strip() + "”");
 			return null;
 		}
 		return vocabulary.canonical(proposed.strip());
@@ -96,12 +102,12 @@ public record UnderstoodQuestion(
 			parsed = LocalDate.parse(proposed.strip());
 		}
 		catch (DateTimeParseException e) {
-			ignored.add("could not read a date from '" + proposed.strip() + "'");
+			ignored.add("Kunde inte tolka datumet ”" + proposed.strip() + "”");
 			return question.today();
 		}
 
 		if (parsed.isBefore(question.today())) {
-			ignored.add(parsed + " has been and gone");
+			ignored.add(parsed + " har redan varit");
 			return question.today();
 		}
 
@@ -113,7 +119,7 @@ public record UnderstoodQuestion(
 		LocalDate furthest = question.today().plusDays(question.horizonDays() - 1L);
 
 		if (parsed.isAfter(furthest)) {
-			ignored.add("we only know availability up to " + furthest);
+			ignored.add("Vi känner bara till tider fram till " + furthest);
 			return question.today();
 		}
 
@@ -128,7 +134,7 @@ public record UnderstoodQuestion(
 			return SearchPort.PartOfDay.valueOf(proposed.strip().toUpperCase());
 		}
 		catch (IllegalArgumentException e) {
-			ignored.add("could not read a time of day from '" + proposed.strip() + "'");
+			ignored.add("Kunde inte tolka tiden på dygnet ”" + proposed.strip() + "”");
 			return SearchPort.PartOfDay.ANY;
 		}
 	}

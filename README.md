@@ -170,7 +170,17 @@ API without anything hand-written in between:
   *checked* `ExecutionException` through a signature that declares nothing, so
   `catch (RuntimeException)` compiled and missed it. The invocation now sits
   behind a seam declared `throws Exception`, which makes the compiler insist
-- 105 tests
+- **The consumer site has the box.** A sentence sets the filters and then the
+  filters are what the URL carries — so a refresh or a back button cannot
+  silently buy another interpretation, and what gets shared is the search rather
+  than the phrasing. What was understood appears above the results with the
+  category as a one-click chip to remove, because a filter the customer cannot
+  see is one they cannot correct. Touching any filter by hand takes the note
+  down rather than letting us take credit for their edit. Verified in a browser
+  with the gate off and again with a deliberately invalid key: the box appears,
+  the sentence submits, the Swedish note renders, no error, and the results are
+  the ones the plain search would have given
+- 105 tests and 20 browser tests
 
 Sketch:
 

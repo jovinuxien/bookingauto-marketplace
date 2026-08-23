@@ -58,7 +58,7 @@ class QueryGroundingTest {
 		var understood = UnderstoodQuestion.ground(asked(), said("harfargning", "", ""), VOCABULARY);
 
 		assertThat(understood.request().categorySlug()).isNull();
-		assertThat(understood.ignored()).containsExactly("we have no category called 'harfargning'");
+		assertThat(understood.ignored()).containsExactly("Vi har ingen kategori som heter ”harfargning”");
 	}
 
 	@Test
@@ -79,7 +79,7 @@ class QueryGroundingTest {
 		var understood = UnderstoodQuestion.ground(asked(), said("", "2026-10-01", ""), VOCABULARY);
 
 		assertThat(understood.request().day()).isEqualTo(TODAY);
-		assertThat(understood.ignored()).containsExactly("we only know availability up to 2026-09-04");
+		assertThat(understood.ignored()).containsExactly("Vi känner bara till tider fram till 2026-09-04");
 	}
 
 	@Test
@@ -88,7 +88,7 @@ class QueryGroundingTest {
 		var understood = UnderstoodQuestion.ground(asked(), said("", "2026-08-21", ""), VOCABULARY);
 
 		assertThat(understood.request().day()).isEqualTo(TODAY);
-		assertThat(understood.ignored()).containsExactly("2026-08-21 has been and gone");
+		assertThat(understood.ignored()).containsExactly("2026-08-21 har redan varit");
 	}
 
 	@Test
@@ -100,7 +100,7 @@ class QueryGroundingTest {
 
 		assertThat(understood.request().day()).isEqualTo(TODAY);
 		assertThat(understood.request().categorySlug()).isEqualTo("har");
-		assertThat(understood.ignored()).containsExactly("could not read a date from 'på lördag'");
+		assertThat(understood.ignored()).containsExactly("Kunde inte tolka datumet ”på lördag”");
 	}
 
 	@Test
@@ -110,7 +110,7 @@ class QueryGroundingTest {
 
 		assertThat(understood.request().partOfDay()).isEqualTo(SearchPort.PartOfDay.ANY);
 		assertThat(understood.ignored())
-			.containsExactly("could not read a time of day from 'LUNCHTIME'");
+			.containsExactly("Kunde inte tolka tiden på dygnet ”LUNCHTIME”");
 	}
 
 	@Test
@@ -187,7 +187,7 @@ class QueryGroundingTest {
 			asked(), said("har", "", ""), new CategoryVocabulary(List.of()));
 
 		assertThat(understood.request().categorySlug()).isNull();
-		assertThat(understood.ignored()).containsExactly("we have no category called 'har'");
+		assertThat(understood.ignored()).containsExactly("Vi har ingen kategori som heter ”har”");
 	}
 
 }

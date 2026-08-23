@@ -94,7 +94,7 @@ class QueryUnderstanding {
 		}
 
 		if (question.text().length() > maxQueryLength) {
-			return UnderstoodQuestion.plain(question, "that is longer than we read");
+			return UnderstoodQuestion.plain(question, "Söktexten är för lång — det här är allt i närheten");
 		}
 
 		// Counted last of the cheap checks, and only where the next line would
@@ -104,7 +104,7 @@ class QueryUnderstanding {
 			// Not a 429. What is being protected is a bill, not a resource, and
 			// the customer is still owed the search they asked for — they get
 			// the same salons, without the sentence having been read.
-			return UnderstoodQuestion.plain(question, "this is everything nearby");
+			return UnderstoodQuestion.plain(question, "Det här är allt i närheten");
 		}
 
 		try {
@@ -118,7 +118,7 @@ class QueryUnderstanding {
 			// error: the customer got results, and what is broken is a feature
 			// on top of them.
 			log.warn("could not interpret '{}': {}", question.text(), rootOf(e));
-			return UnderstoodQuestion.plain(question, "we could not read that, so this is everything nearby");
+			return UnderstoodQuestion.plain(question, "Vi kunde inte tolka söktexten — det här är allt i närheten");
 		}
 	}
 

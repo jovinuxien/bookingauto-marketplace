@@ -1,12 +1,13 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { useAppDispatch, useAppSelector } from 'app/config/store';
-import { runSearch } from 'app/shared/reducers/search.reducer';
+import { askSearch, interpretationDropped, runSearch } from 'app/shared/reducers/search.reducer';
 import { DEFAULT_RADIUS_METRES, FALLBACK_POSITION } from 'app/config/constants';
 import { addDays, formatDay, formatDistance, formatPrice, formatTime, todayInZone }
   from 'app/shared/util/format';
 import type { SearchHit } from 'app/shared/model/marketplace.model';
+import type { Interpretation } from 'app/shared/reducers/search.reducer';
 
 const PARTS = [
   { value: 'ANY', label: 'När som helst' },
@@ -25,26 +26,98 @@ const PARTS = [
 const SearchResults = () => {
   const dispatch = useAppDispatch();
   const [params, setParams] = useSearchParams();
-  const { hits, loading, error, searched } = useAppSelector(state => state.search);
+  const { hits, loading, error, searched, interpretation, interpreting } =
+    useAppSelector(state => state.search);
 
   const lat = Number(params.get('lat') ?? FALLBACK_POSITION.lat);
   const lon = Number(params.get('lon') ?? FALLBACK_POSITION.lon);
   const day = params.get('day') ?? todayInZone();
   const when = (params.get('when') ?? 'ANY') as SearchCriteriaWhen;
   const radius = Number(params.get('radius') ?? DEFAULT_RADIUS_METRES);
+  const category = params.get('category') ?? undefined;
+
+  /**
+   * The sentence is not in the URL, and that is deliberate.
+   *
+   * Every other criterion is, so a search can be shared and reloaded. This one
+   * is metered: in the URL, a refresh or a back button would silently buy
+   * another interpretation. Instead the sentence sets the filters once and the
+   * filters are what the URL carries — which is also the shareable thing, since
+   * what someone wants to send a friend is the search, not the phrasing.
+   */
+  const [question, setQuestion] = useState('');
 
   useEffect(() => {
-    dispatch(runSearch({ lat, lon, radius, day, when }));
-  }, [dispatch, lat, lon, radius, day, when]);
+    dispatch(runSearch({ lat, lon, radius, day, when, category }));
+  }, [dispatch, lat, lon, radius, day, when, category]);
 
   const update = (changes: Record<string, string>) => {
+    // A filter touched by hand means the results are no longer what we
+    // understood, so the note comes down rather than taking credit for it.
+    dispatch(interpretationDropped());
     const next = new URLSearchParams(params);
     Object.entries(changes).forEach(([key, value]) => next.set(key, value));
     setParams(next);
   };
 
+  const ask = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!question.trim()) {
+      return;
+    }
+
+    try {
+      const answer = await dispatch(askSearch({ q: question.trim(), lat, lon, radius })).unwrap();
+
+      // What was understood lands in the controls above the results, so the
+      // customer can correct it exactly the way they would have set it.
+      const next = new URLSearchParams(params);
+      next.set('day', answer.applied.day);
+      next.set('when', answer.applied.partOfDay);
+      next.set('radius', String(answer.applied.radiusMetres));
+      if (answer.applied.categorySlug) {
+        next.set('category', answer.applied.categorySlug);
+      } else {
+        next.delete('category');
+      }
+      setParams(next);
+    } catch {
+      // The endpoint is built not to fail; if the request itself did — a
+      // timeout, an offline browser — the filters already on screen are still
+      // a search, and showing an error instead would be the one outcome the
+      // whole design refuses.
+      dispatch(runSearch({ lat, lon, radius, day, when, category }));
+    }
+  };
+
   return (
     <>
+      <form className="mb-3" onSubmit={ask}>
+        <div className="input-group">
+          <input
+            className="form-control"
+            type="search"
+            value={question}
+            maxLength={200}
+            placeholder="Beskriv vad du söker — ”balayage på lördag eftermiddag”"
+            aria-label="Sök med egna ord"
+            onChange={event => setQuestion(event.target.value)}
+          />
+          <button className="btn btn-primary" type="submit" disabled={interpreting || !question.trim()}>
+            {interpreting ? 'Tolkar…' : 'Sök'}
+          </button>
+        </div>
+      </form>
+
+      <Understood interpretation={interpretation} category={category}
+        onClearCategory={() => {
+          const next = new URLSearchParams(params);
+          next.delete('category');
+          dispatch(interpretationDropped());
+          setParams(next);
+        }} />
+
       <div className="d-flex flex-wrap gap-2 align-items-center mb-4">
         <div className="btn-group">
           <button className="btn btn-outline-secondary btn-sm"
@@ -87,6 +160,48 @@ const SearchResults = () => {
 };
 
 type SearchCriteriaWhen = 'ANY' | 'MORNING' | 'AFTERNOON' | 'EVENING';
+
+/**
+ * What we understood, above the results it produced.
+ *
+ * Shown rather than logged. A filter the customer cannot see is one they cannot
+ * correct, and an empty page under a filter nobody chose reads as a city with
+ * no salons in it — so both what was applied and what was refused are on the
+ * page, and the category is removable in one click.
+ */
+const Understood = ({ interpretation, category, onClearCategory }: {
+  interpretation: Interpretation | null;
+  category?: string;
+  onClearCategory: () => void;
+}) => {
+  if (!interpretation) {
+    return null;
+  }
+
+  const { summary, ignored } = interpretation;
+
+  if (!summary && ignored.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="alert alert-light border d-flex flex-wrap gap-2 align-items-center py-2">
+      {summary && <span className="small">{summary}</span>}
+
+      {category && (
+        <button type="button" className="btn btn-sm btn-outline-secondary py-0"
+          onClick={onClearCategory}>
+          {category} <span aria-hidden="true">✕</span>
+          <span className="visually-hidden">Ta bort kategorifiltret</span>
+        </button>
+      )}
+
+      {ignored.map(note => (
+        <span key={note} className="small text-muted">{note}</span>
+      ))}
+    </div>
+  );
+};
 
 const ResultCard = ({ hit }: { hit: SearchHit }) => (
   <div className="col-12">

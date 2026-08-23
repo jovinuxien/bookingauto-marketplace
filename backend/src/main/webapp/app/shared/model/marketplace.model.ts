@@ -27,6 +27,31 @@ export interface SearchHit {
   indexAgeSeconds: number;
 }
 
+/**
+ * How a sentence was read, returned alongside the results it produced.
+ *
+ * `applied` is what actually went into the query, not what the model proposed;
+ * where the two differ, `ignored` says so in words. Both are rendered rather
+ * than logged — a filter the customer cannot see is one they cannot correct,
+ * and an empty page is otherwise indistinguishable from a city with no
+ * availability.
+ */
+export interface AskedAnswer {
+  /** One line in the customer's own language, or null when nothing read the text. */
+  summary: string | null;
+  /** Filters that were proposed and refused. Usually empty. */
+  ignored: string[];
+  applied: {
+    categorySlug: string | null;
+    day: string;
+    partOfDay: PartOfDay;
+    radiusMetres: number;
+  };
+  hits: SearchHit[];
+}
+
+export type PartOfDay = 'ANY' | 'MORNING' | 'AFTERNOON' | 'EVENING';
+
 export interface Service {
   id: number;
   name: string;

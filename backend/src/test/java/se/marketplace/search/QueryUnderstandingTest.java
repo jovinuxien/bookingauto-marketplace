@@ -114,7 +114,7 @@ class QueryUnderstandingTest {
 		// input that costs us nothing.
 		var understood = understanding.of(asking("x".repeat(201)), CALLER);
 
-		assertThat(understood.ignored()).containsExactly("that is longer than we read");
+		assertThat(understood.ignored()).containsExactly("Söktexten är för lång — det här är allt i närheten");
 		assertThat(limiter.counted).isEmpty();
 	}
 
@@ -137,7 +137,7 @@ class QueryUnderstandingTest {
 
 		assertThat(understood.request().categorySlug()).isNull();
 		assertThat(understood.request().partOfDay()).isEqualTo(SearchPort.PartOfDay.ANY);
-		assertThat(understood.ignored()).containsExactly("this is everything nearby");
+		assertThat(understood.ignored()).containsExactly("Det här är allt i närheten");
 	}
 
 	@Test
@@ -151,7 +151,7 @@ class QueryUnderstandingTest {
 		assertThat(understood.request().radiusMetres()).isEqualTo(5000);
 		assertThat(understood.request().limit()).isEqualTo(20);
 		assertThat(understood.ignored())
-			.containsExactly("we could not read that, so this is everything nearby");
+			.containsExactly("Vi kunde inte tolka söktexten — det här är allt i närheten");
 	}
 
 	@Test
@@ -171,7 +171,7 @@ class QueryUnderstandingTest {
 
 		assertThat(understood.request().radiusMetres()).isEqualTo(5000);
 		assertThat(understood.ignored())
-			.containsExactly("we could not read that, so this is everything nearby");
+			.containsExactly("Vi kunde inte tolka söktexten — det här är allt i närheten");
 	}
 
 	/**
