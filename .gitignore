@@ -3,5 +3,5 @@ node_modules/
 dist/
 *.log
 target/
-node_modules/
 backend/node/
+.idea/
