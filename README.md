@@ -195,7 +195,20 @@ API without anything hand-written in between:
   nobody sells it, the sitemap lists both real pages, and
   `?category=massage` returns one salon where `?category=har` returns three.
   See ADR 0013
-- 117 tests and 22 browser tests
+- **The login endpoint is counted**, at 30 attempts per hour per socket
+  address, and the count happens *before* the password is checked. That
+  ordering is the whole feature: verifying a password is deliberately slow, so
+  an endpoint that checks first has already paid for the request it is about to
+  refuse. Over the limit is a 429 — unlike interpreted search, there is no
+  degraded answer to give someone signing in, and the SPA says so in Swedish
+  rather than repeating "wrong password" at someone whose password is right.
+  There is deliberately **no per-account limit**: refusing before the password
+  is checked cannot tell a salon from someone guessing at it, so a bucket keyed
+  on the email address would be a lockout anyone could trigger against any
+  salon whose address they knew. A distributed guess at one account is
+  therefore bounded by password strength and not by this — a gap written down
+  rather than closed, because closing it that way costs more than it buys
+- 122 tests and 22 browser tests
 
 Sketch:
 
@@ -328,13 +341,10 @@ In the order worth doing it:
    which makes this the largest remaining gap in the product.
 3. HTML email. The messages are plain text, which is honest and legible but
    not what a consumer brand ships.
-4. Rate-limit the login endpoint. The limiter built for signup is general and
-   the login form has none, which is a separate decision from ADR 0011 and a
-   small one.
 
 Done: the availability reconciler, the booking funnel with its compensations,
 Stripe Connect with the asynchronous payment path, provider onboarding,
-self-serve signup, and geocoding.
+self-serve signup, geocoding, and the limit on the login endpoint.
 
 ## Known shape problems, recorded early
 
@@ -367,8 +377,8 @@ Backend-only builds pass `-Dskip.npm=true`, which is the default.
 
 ```bash
 cd backend
-mvn test              # 71 — logic, module boundaries, every compensation path
-npx playwright test   # 17 — what a person actually sees, needs a running stack
+mvn test              # 122 — logic, module boundaries, every compensation path
+npx playwright test   # 22 — what a person actually sees, needs a running stack
 ```
 
 The browser suite exists for one reason. The landing pages once returned
@@ -401,6 +411,7 @@ now listed on purpose in `console/SecurityConfig`. Four categories:
 | `/internal/**` | verified by signature, not by session |
 | `/api/console/**` | authenticated, scoped to the session's provider |
 | `/api/signup/**` | anonymous, rate limited, and provisions nothing until a link sent to the address is clicked |
+| `POST /api/auth/login` | anonymous, and counted per source address before the password is checked |
 | `POST /api/providers` | platform admin only — it creates the Cal and Stripe accounts immediately, which is exactly why the public path is `/api/signup` |
 
 Sessions rather than tokens: the SPA ships in the same jar, so the cookie is

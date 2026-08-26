@@ -108,6 +108,22 @@ marketplace:
 
     expiry-sweep-ms: ${MARKETPLACE_SIGNUP_EXPIRY_SWEEP_MS:900000}
 
+  console:
+    # Sign-in attempts per hour from one source address, counted before the
+    # password is checked -- verifying one is deliberately slow, and that
+    # slowness is what an unlimited login endpoint sells cheaply.
+    #
+    # Higher than the signup limits because this one refuses a real person
+    # rather than a form: a front desk with four staff behind one connection,
+    # a session that expired, a password being hunted for in a drawer. A guess
+    # worth making needs thousands, so there is a lot of room between the two.
+    #
+    # There is deliberately no per-address limit to go with it. See
+    # LoginAttempts: refusing before the password is checked cannot tell an
+    # owner from someone guessing at them, which makes a per-account bucket a
+    # lockout anyone can trigger against any salon whose email they know.
+    login-per-ip-per-hour: ${MARKETPLACE_CONSOLE_LOGIN_PER_IP_PER_HOUR:30}
+
   # Agents. Off, and that is the default a deployment has to override
   # deliberately -- this is the first dependency billed per request rather than
   # per month, sitting in front of the endpoint customers hit most. Same

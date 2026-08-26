@@ -67,11 +67,19 @@ const authSlice = createSlice({
         state.resolved = true;
         state.session = action.payload;
       })
-      .addCase(login.rejected, state => {
+      .addCase(login.rejected, (state, action) => {
         state.loading = false;
         state.resolved = true;
-        // One message regardless of which half was wrong, matching the server.
-        state.error = 'Fel e-post eller lösenord.';
+        // 429 has to read differently. Someone who has just mistyped their
+        // password several times and is then told it is wrong again will keep
+        // trying and keep being refused, without ever learning that the answer
+        // is to wait -- so being throttled says so, and says nothing about
+        // whether the credentials were right.
+        state.error =
+          action.payload?.status === 429
+            ? 'För många inloggningsförsök. Vänta en stund och försök igen.'
+            : // One message regardless of which half was wrong, matching the server.
+              'Fel e-post eller lösenord.';
       })
       .addCase(loadSession.fulfilled, (state, action) => {
         state.resolved = true;

@@ -37,17 +37,29 @@ class AuthController {
 
 	private final AuthenticationManager authenticationManager;
 	private final ProviderUserRepository repository;
+	private final LoginAttempts attempts;
 	private final SecurityContextRepository contextRepository =
 		new HttpSessionSecurityContextRepository();
 
-	AuthController(AuthenticationManager authenticationManager, ProviderUserRepository repository) {
+	AuthController(AuthenticationManager authenticationManager, ProviderUserRepository repository,
+		LoginAttempts attempts) {
+
 		this.authenticationManager = authenticationManager;
 		this.repository = repository;
+		this.attempts = attempts;
 	}
 
 	@PostMapping("/login")
 	ResponseEntity<Session> login(@RequestBody Credentials credentials,
 		HttpServletRequest request, HttpServletResponse response) {
+
+		// Before the password is checked, not after. Verifying one is deliberately
+		// slow, so an endpoint that checks first has already paid for the request
+		// it is about to refuse. 429 is honest here in a way it would not be on
+		// /api/search/ask: there is no degraded answer to give someone signing in.
+		if (!attempts.permit(clientIp(request))) {
+			return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
+		}
 
 		Authentication authentication;
 		try {
@@ -92,6 +104,18 @@ class AuthController {
 			principal.displayName(),
 			principal.providerIdOrNull(),
 			principal.getAuthorities().iterator().next().getAuthority());
+	}
+
+	/**
+	 * Who is calling, for the purpose of counting them.
+	 *
+	 * <p>The socket address, never {@code X-Forwarded-For} — that header is
+	 * written by the client, one fresh value per request if they like. Behind a
+	 * proxy the fix is {@code server.forward-headers-strategy}, which is a
+	 * deployment decision and correctly not one this class gets to make.
+	 */
+	private static String clientIp(HttpServletRequest request) {
+		return request.getRemoteAddr();
 	}
 
 	record Credentials(String email, String password) {}
