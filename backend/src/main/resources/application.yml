@@ -108,6 +108,29 @@ marketplace:
 
     expiry-sweep-ms: ${MARKETPLACE_SIGNUP_EXPIRY_SWEEP_MS:900000}
 
+  booking:
+    # The link in a confirmation email is what a consumer has instead of an
+    # account (ADR 0014), so this key is what stands between a stranger and
+    # somebody else's appointment. There is no default on purpose: a shipped
+    # constant would make every deployment that forgot to set it forgeable by
+    # anyone who had read this repository.
+    #
+    # Blank generates one per process and says so loudly at startup. That keeps
+    # a developer machine working and makes the cost visible -- every link
+    # already emailed stops verifying at the next restart.
+    link-secret: ${MARKETPLACE_BOOKING_LINK_SECRET:}
+
+    # How long before the appointment cancelling still returns the money.
+    # Copied onto each booking as it is sold, so changing this affects what is
+    # sold next rather than what was already agreed.
+    cancellation-cutoff-hours: ${MARKETPLACE_BOOKING_CANCELLATION_CUTOFF_HOURS:24}
+
+    # Per hour, per source. Not defending the token -- that is an HMAC and
+    # guessing it is not a strategy -- but the endpoint is anonymous and does a
+    # join per call. High enough that a customer refreshing the page while they
+    # think about it never notices.
+    lookup-per-ip-per-hour: ${MARKETPLACE_BOOKING_LOOKUP_PER_IP_PER_HOUR:120}
+
   console:
     # Sign-in attempts per hour from one source address, counted before the
     # password is checked -- verifying one is deliberately slow, and that

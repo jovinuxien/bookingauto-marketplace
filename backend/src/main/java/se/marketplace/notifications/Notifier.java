@@ -32,6 +32,29 @@ public interface Notifier {
 	void bookingRefunded(BookingNotice notice, String reason);
 
 	/**
+	 * The customer cancelled, and this is what it cost them.
+	 *
+	 * <p>One method with a flag rather than two, because the caller knows the
+	 * commercial fact — money came back or it did not — and which of those
+	 * becomes which words is this module's business, exactly as it is for every
+	 * other event here.
+	 *
+	 * @param refunded whether the cancellation was inside the free window
+	 */
+	void bookingCancelled(BookingNotice notice, boolean refunded, int cutoffHours);
+
+	/**
+	 * The salon's slot is free again.
+	 *
+	 * <p>The first message this system sends to a salon rather than to a
+	 * customer, which is why it takes the recipient explicitly: every other
+	 * notice here goes to {@code notice.customerEmail()}, and quietly widening
+	 * that field to mean "whoever this is about" is how a customer eventually
+	 * receives a salon's copy.
+	 */
+	void providerBookingCancelled(BookingNotice notice, String providerEmail);
+
+	/**
 	 * Something is unresolved and a person is looking at it.
 	 *
 	 * <p>Deliberately does not tell the customer to try again — the funnel
@@ -44,6 +67,10 @@ public interface Notifier {
 	 * @param providerId nullable: an attempt can fail before it is tied to a
 	 *        salon, and a message that cannot be sent because a foreign key is
 	 *        missing is the worst possible time to lose one
+	 * @param manageUrl  where the customer reaches this booking again. Null for
+	 *        every event about a sale that did not complete, because there is
+	 *        nothing there to reach — the field is not optional decoration, it
+	 *        is absent exactly when a booking is
 	 */
 	record BookingNotice(
 		String dedupeKey,
@@ -55,7 +82,8 @@ public interface Notifier {
 		int priceMinor,
 		String currency,
 		Long bookingId,
-		Long providerId
+		Long providerId,
+		String manageUrl
 	) {}
 
 }

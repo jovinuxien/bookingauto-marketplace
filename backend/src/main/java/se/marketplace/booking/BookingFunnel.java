@@ -55,6 +55,7 @@ public class BookingFunnel {
 	private final PaymentPort payments;
 	private final AvailabilityRefreshPort availability;
 	private final Notifier notifier;
+	private final BookingLinks links;
 
 	/** Basis points. 1500 = 15%. Frozen onto the attempt at stage 5. */
 	@Value("${marketplace.commission-bps:1500}")
@@ -63,13 +64,22 @@ public class BookingFunnel {
 	@Value("${marketplace.cal.timezone:Europe/Stockholm}")
 	private String timeZone;
 
+	/**
+	 * How long before the appointment a cancellation still returns the money.
+	 * Read here and frozen onto the booking, never read at cancellation time.
+	 */
+	@Value("${marketplace.booking.cancellation-cutoff-hours:24}")
+	private int cancellationCutoffHours;
+
 	BookingFunnel(BookingRepository repository, CalBookingPort cal,
-		PaymentPort payments, AvailabilityRefreshPort availability, Notifier notifier) {
+		PaymentPort payments, AvailabilityRefreshPort availability, Notifier notifier,
+		BookingLinks links) {
 		this.repository = repository;
 		this.cal = cal;
 		this.payments = payments;
 		this.availability = availability;
 		this.notifier = notifier;
+		this.links = links;
 	}
 
 	/**
@@ -228,7 +238,8 @@ public class BookingFunnel {
 		}
 
 		long bookingId = repository.createBooking(
-			attempt, reservation.uid(), reservation.start(), reservation.end());
+			attempt, reservation.uid(), reservation.start(), reservation.end(),
+			cancellationCutoffHours);
 		repository.transition(attempt, AttemptState.CONFIRMED, "cal", "ok",
 			"booking=" + bookingId, false);
 
@@ -282,7 +293,7 @@ public class BookingFunnel {
 		}
 
 		long bookingId = repository.createBooking(attempt, attempt.calBookingUid(),
-			attempt.slotStart(), attempt.reservedEnd());
+			attempt.slotStart(), attempt.reservedEnd(), cancellationCutoffHours);
 		repository.transition(attempt, AttemptState.CONFIRMED, "cal", "ok",
 			"booking=" + bookingId, false);
 
@@ -449,7 +460,12 @@ public class BookingFunnel {
 			attempt.priceMinor(),
 			attempt.currency(),
 			attempt.bookingId(),
-			attempt.providerId());
+			attempt.providerId(),
+			// Only once there is a booking. Every other event here is about a
+			// sale that did not complete, and a link to a booking that was never
+			// written is a 404 sent to someone already having a bad time.
+			attempt.bookingId() == null
+				? null : links.urlFor(attempt.bookingId(), attempt.customerEmail()));
 	}
 
 	private Outcome outcomeOf(Attempt attempt) {

@@ -5,6 +5,7 @@ import Home from 'app/modules/home/home';
 import SearchResults from 'app/modules/search/search-results';
 import ProviderPage from 'app/modules/provider/provider-page';
 import Checkout from 'app/modules/booking/checkout';
+import MyBooking from 'app/modules/booking/my-booking';
 import Login from 'app/modules/login/login';
 import Register from 'app/modules/signup/register';
 import Verify from 'app/modules/signup/verify';
@@ -31,6 +32,9 @@ const AppRoutes = () => (
     {/* Where the verification email lands. Public by necessity: the token in
         the query string is the only credential the visitor has. */}
     <Route path="/verifiera" element={<Verify />} />
+    {/* Where a confirmation email points. The token is in the query because an
+        email link has no other way to carry one; it goes no further than this. */}
+    <Route path="/bokning" element={<MyBooking />} />
     <Route path="/logga-in" element={<Login />} />
     <Route path="/konsol" element={<PrivateRoute><Console /></PrivateRoute>} />
     <Route path="*" element={<NotFound />} />

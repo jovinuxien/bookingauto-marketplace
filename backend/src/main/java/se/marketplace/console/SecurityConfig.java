@@ -65,6 +65,12 @@ class SecurityConfig {
 				// that it creates nothing until an email is answered.
 				.ignoringRequestMatchers(
 					new AntPathRequestMatcher("/api/bookings", HttpMethod.POST.name()),
+					// Same shape, and authorised by a token in the body rather
+					// than by anything a browser attaches on its own. A forged
+					// request would have to carry the token, and anything that
+					// can read the token can read the booking directly.
+					new AntPathRequestMatcher("/api/bookings/lookup", HttpMethod.POST.name()),
+					new AntPathRequestMatcher("/api/bookings/cancel", HttpMethod.POST.name()),
 					new AntPathRequestMatcher("/api/signup/**", HttpMethod.POST.name())))
 
 			.authorizeHttpRequests(it -> it
@@ -72,6 +78,8 @@ class SecurityConfig {
 				.requestMatchers("/", "/index.html", "/assets/**", "/favicon.ico").permitAll()
 				.requestMatchers("/sok", "/salong/**", "/boka/**", "/logga-in", "/konsol/**").permitAll()
 				.requestMatchers("/registrera", "/verifiera").permitAll()
+				// Where the link in a confirmation email lands.
+				.requestMatchers("/bokning").permitAll()
 
 				// --- the crawlable pages ---------------------------------------
 				// Server-rendered, and useless if a crawler is asked to sign in.
@@ -101,6 +109,16 @@ class SecurityConfig {
 				.requestMatchers(HttpMethod.GET, "/api/providers/*").permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/services/*/slots").permitAll()
 				.requestMatchers(HttpMethod.POST, "/api/bookings").permitAll()
+
+				// A customer's own booking. Anonymous, because there is no
+				// consumer account to authenticate against and deliberately so
+				// (ADR 0014) — what stands in for one is an HMAC in the body,
+				// sent to the address the booking was made with. Listed one
+				// path at a time rather than as /api/bookings/** so that
+				// anything added under that prefix later has to be considered
+				// on its own.
+				.requestMatchers(HttpMethod.POST, "/api/bookings/lookup").permitAll()
+				.requestMatchers(HttpMethod.POST, "/api/bookings/cancel").permitAll()
 
 				.requestMatchers("/api/auth/login").permitAll()
 

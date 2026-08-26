@@ -186,22 +186,32 @@ class BookingRepository {
 	/**
 	 * The commercial record, written only once the sale actually happened.
 	 *
+	 * <p>The cancellation cutoff is written here rather than left to the column
+	 * default, and copied rather than referenced, for the same reason
+	 * {@code price_minor} is: it is a term of this sale. Changing the configured
+	 * default must change what is sold next, never what somebody already agreed
+	 * to. See ADR 0014.
+	 *
 	 * <p>The Cal uid is passed in rather than read off {@code attempt}. It has to
 	 * be: {@link #recordCalUid} writes it to the database, not to the caller's
 	 * in-memory copy, so the attempt object still carries null at this point. A
 	 * NOT NULL constraint caught it here, which is the good outcome — but the
 	 * argument is what stops it recurring.
 	 */
-	long createBooking(Attempt attempt, String calBookingUid, Instant startsAt, Instant endsAt) {
+	long createBooking(Attempt attempt, String calBookingUid, Instant startsAt, Instant endsAt,
+		int cancellationCutoffHours) {
+
 		var keys = new GeneratedKeyHolder();
 
 		jdbc.update("""
 			INSERT INTO booking
 			  (provider_id, service_id, cal_booking_uid, starts_at, ends_at,
-			   customer_email, customer_name, price_minor, commission_minor, currency)
+			   customer_email, customer_name, price_minor, commission_minor, currency,
+			   cancellation_cutoff_hours)
 			VALUES
 			  (:providerId, :serviceId, :uid, :startsAt, :endsAt,
-			   :email, :name, :priceMinor, :commissionMinor, :currency)
+			   :email, :name, :priceMinor, :commissionMinor, :currency,
+			   :cutoffHours)
 			""",
 			new MapSqlParameterSource()
 				.addValue("providerId", attempt.providerId())
@@ -213,7 +223,8 @@ class BookingRepository {
 				.addValue("name", attempt.customerName())
 				.addValue("priceMinor", attempt.priceMinor())
 				.addValue("commissionMinor", attempt.commissionMinor())
-				.addValue("currency", attempt.currency()),
+				.addValue("currency", attempt.currency())
+				.addValue("cutoffHours", cancellationCutoffHours),
 			keys, new String[] { "id" });
 
 		long bookingId = keys.getKey().longValue();
@@ -222,6 +233,124 @@ class BookingRepository {
 			new MapSqlParameterSource().addValue("bid", bookingId).addValue("id", attempt.id()));
 
 		return bookingId;
+	}
+
+	// ------------------------------------------------- after the sale --
+
+	/**
+	 * A confirmed booking, as the customer who made it needs to see it.
+	 *
+	 * <p>Joined rather than assembled from three calls because every field here
+	 * is shown on one page, and because the payment reference has to come with
+	 * it: refunding needs the charge, and the charge is on the attempt rather
+	 * than on the commercial record. Kept there deliberately — {@code booking}
+	 * is what was sold, and Stripe's identifier for how it was paid for belongs
+	 * with the attempt that did the paying.
+	 */
+	Optional<ConsumerBooking> findBookingForCustomer(long id) {
+		return jdbc.query("""
+			SELECT b.id, b.provider_id, b.service_id, b.cal_booking_uid,
+			       b.starts_at, b.ends_at, b.customer_email, b.customer_name,
+			       b.price_minor, b.currency, b.status,
+			       b.cancellation_cutoff_hours, b.cancelled_at, b.needs_attention,
+			       -- contact_email, not email. db/001's provider.email is a
+			       -- marketing field and is null on every row in this database;
+			       -- what onboarding and signup actually write is contact_email,
+			       -- added by db/004. Reading the wrong one compiles, runs, and
+			       -- silently never notifies a salon that a slot came free.
+			       p.name AS provider_name, p.city,
+			       COALESCE(p.contact_email, p.email) AS provider_email,
+			       s.name AS service_name,
+			       (SELECT a.payment_ref FROM booking_attempt a
+			         WHERE a.booking_id = b.id AND a.payment_ref IS NOT NULL
+			         LIMIT 1) AS payment_ref
+			  FROM booking b
+			  JOIN provider p ON p.id = b.provider_id
+			  JOIN service  s ON s.id = b.service_id
+			 WHERE b.id = :id
+			""",
+			new MapSqlParameterSource("id", id),
+			(ResultSet rs, int n) -> new ConsumerBooking(
+				rs.getLong("id"),
+				rs.getLong("provider_id"),
+				rs.getLong("service_id"),
+				rs.getString("cal_booking_uid"),
+				rs.getTimestamp("starts_at").toInstant(),
+				rs.getTimestamp("ends_at").toInstant(),
+				rs.getString("customer_email"),
+				rs.getString("customer_name"),
+				rs.getInt("price_minor"),
+				rs.getString("currency"),
+				rs.getString("status"),
+				rs.getInt("cancellation_cutoff_hours"),
+				rs.getTimestamp("cancelled_at") == null
+					? null : rs.getTimestamp("cancelled_at").toInstant(),
+				rs.getBoolean("needs_attention"),
+				rs.getString("provider_name"),
+				rs.getString("provider_email"),
+				rs.getString("city"),
+				rs.getString("service_name"),
+				rs.getString("payment_ref"))).stream().findFirst();
+	}
+
+	/**
+	 * Takes ownership of a cancellation, and refuses to hand it out twice.
+	 *
+	 * <p>The {@code status = 'confirmed'} predicate is the whole point and is
+	 * not a convenience. A customer who double-clicks, or opens the link on a
+	 * phone and a laptop, produces two requests in flight at once — and both
+	 * would read a confirmed booking, both would ask Cal to release the slot,
+	 * and both would refund. Checking the status in Java loses that race by
+	 * construction; the database is the only place it can be settled.
+	 *
+	 * <p><strong>It claims before the work, not after.</strong> Which means the
+	 * row says cancelled while Cal and Stripe are still being asked, and that is
+	 * why it also sets {@code needs_attention}: between here and
+	 * {@link #settleCancellation} the booking is one whose outcome nobody knows,
+	 * and a process that dies in that window has to leave something behind that
+	 * says so. The flag is cleared by the settle when everything worked.
+	 *
+	 * <p>The alternative — do the work first, write afterwards — makes a crash
+	 * lose nothing but makes a double click refund twice. A visible
+	 * inconsistency a person can reconcile is worth more than money out of the
+	 * door twice, so this claims first.
+	 *
+	 * @return whether this call is the one that owns the cancellation
+	 */
+	boolean claimForCancellation(long id) {
+		return jdbc.update("""
+			UPDATE booking
+			   SET status = 'cancelled',
+			       cancelled_at = now(),
+			       needs_attention = true,
+			       updated_at = now()
+			 WHERE id = :id AND status = 'confirmed'
+			""",
+			new MapSqlParameterSource("id", id)) == 1;
+	}
+
+	/**
+	 * Records how the claimed cancellation actually went.
+	 *
+	 * <p>Unguarded on purpose. The claim already established that this caller
+	 * owns the row, and a guard here would mean a settle that silently did
+	 * nothing — which is the one thing that must not happen after money has
+	 * moved.
+	 */
+	void settleCancellation(long id, String status, String refundRef, boolean needsAttention) {
+		jdbc.update("""
+			UPDATE booking
+			   SET status = :status,
+			       refund_ref = :refundRef,
+			       needs_attention = :attention,
+			       updated_at = now()
+			 WHERE id = :id
+			""",
+			new MapSqlParameterSource()
+				.addValue("status", status)
+				.addValue("refundRef", refundRef)
+				.addValue("attention", needsAttention)
+				.addValue("id", id));
 	}
 
 	/**
@@ -307,6 +436,38 @@ class BookingRepository {
 				return rs.wasNull() ? null : age;
 			});
 		return ages.isEmpty() ? null : ages.get(0);
+	}
+
+	/**
+	 * @param paymentRef        the settled charge, or null for a booking made
+	 *                          before payments were wired to anything real
+	 * @param needsAttention    the slot was released and the refund was not
+	 */
+	record ConsumerBooking(
+		long id,
+		long providerId,
+		long serviceId,
+		String calBookingUid,
+		Instant startsAt,
+		Instant endsAt,
+		String customerEmail,
+		String customerName,
+		int priceMinor,
+		String currency,
+		String status,
+		int cancellationCutoffHours,
+		Instant cancelledAt,
+		boolean needsAttention,
+		String providerName,
+		String providerEmail,
+		String city,
+		String serviceName,
+		String paymentRef
+	) {
+
+		boolean confirmed() {
+			return "confirmed".equals(status);
+		}
 	}
 
 	record ServiceForSale(

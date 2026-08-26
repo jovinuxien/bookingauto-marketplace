@@ -51,10 +51,15 @@ class BookingFunnelTest {
 		refreshed = new ArrayList<>();
 		notifier = new RecordingNotifier();
 
+		BookingLinks links = new BookingLinks();
+		ReflectionTestUtils.setField(links, "configuredSecret", "test-secret");
+		ReflectionTestUtils.setField(links, "publicUrl", "https://boka.example.se");
+
 		funnel = new BookingFunnel(repository, cal, payments,
-			serviceId -> refreshed.add(serviceId), notifier);
+			serviceId -> refreshed.add(serviceId), notifier, links);
 		ReflectionTestUtils.setField(funnel, "commissionBps", 1500);
 		ReflectionTestUtils.setField(funnel, "timeZone", "Europe/Stockholm");
+		ReflectionTestUtils.setField(funnel, "cancellationCutoffHours", 24);
 	}
 
 	private BookingFunnel.Outcome book() {
@@ -400,6 +405,9 @@ class BookingFunnelTest {
 	 */
 	private static final class RecordingRepository extends BookingRepository {
 
+		/** The cancellation terms each sale was written with. */
+		final List<Integer> cutoffs = new ArrayList<>();
+
 		private final List<AttemptState> transitions = new ArrayList<>();
 		private Attempt started;
 		Attempt current;
@@ -486,7 +494,8 @@ class BookingFunnelTest {
 		}
 
 		@Override
-		long createBooking(Attempt attempt, String calBookingUid, Instant startsAt, Instant endsAt) {
+		long createBooking(Attempt attempt, String calBookingUid, Instant startsAt, Instant endsAt,
+			int cancellationCutoffHours) {
 			// Asserted, not ignored. The first version of this fake accepted
 			// anything and so missed a null uid that the real NOT NULL
 			// constraint rejected at runtime. A fake laxer than the schema tests
@@ -494,6 +503,7 @@ class BookingFunnelTest {
 			if (calBookingUid == null || calBookingUid.isBlank()) {
 				throw new IllegalStateException("booking created without a cal uid");
 			}
+			cutoffs.add(cancellationCutoffHours);
 			return 99L;
 		}
 
@@ -523,10 +533,12 @@ class BookingFunnelTest {
 
 		final List<String> sent = new ArrayList<>();
 		final List<String> keys = new ArrayList<>();
+		final List<String> manageUrls = new ArrayList<>();
 
 		private void record(String kind, BookingNotice notice) {
 			sent.add(kind);
 			keys.add(notice.dedupeKey());
+			manageUrls.add(notice.manageUrl());
 		}
 
 		@Override
@@ -542,6 +554,16 @@ class BookingFunnelTest {
 		@Override
 		public void bookingRefunded(BookingNotice notice, String reason) {
 			record("refunded", notice);
+		}
+
+		@Override
+		public void bookingCancelled(BookingNotice notice, boolean refunded, int cutoffHours) {
+			record(refunded ? "cancelled-refunded" : "cancelled", notice);
+		}
+
+		@Override
+		public void providerBookingCancelled(BookingNotice notice, String providerEmail) {
+			record("provider-cancelled", notice);
 		}
 
 		@Override

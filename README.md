@@ -208,7 +208,43 @@ API without anything hand-written in between:
   salon whose address they knew. A distributed guess at one account is
   therefore bounded by password strength and not by this — a gap written down
   rather than closed, because closing it that way costs more than it buys
-- 122 tests and 22 browser tests
+- **A customer can reach their booking and undo it.** The confirmation email
+  carries a signed link, and that link is the whole of consumer identity — no
+  account, no password, no `consumer` table. An HMAC over the booking id and the
+  address it was sent to, derived rather than stored, because unlike a
+  verification link it is opened repeatedly and has no state anyone would spend.
+  Cancelling is free until 24 hours before and after that the slot still comes
+  back while the money does not; the number is shown before the button, and is
+  frozen onto the booking at sale time so a later policy change cannot rewrite a
+  completed sale. `booking.status` has allowed `cancelled` and `refunded` since
+  db/002 and this is the first thing that writes them. See ADR 0014.
+
+  The order is the design: claim the row, release the slot, then refund. Claim
+  first because two open tabs both read a confirmed booking and a status check
+  in Java lets both past. **Cal before Stripe**, which is the reverse of the
+  funnel's own `refundAndStop` and right in both places — there the sale never
+  completed, here the customer has asked to lose the appointment, so delivering
+  that and owing them money is flagged and fixable, while the opposite leaves a
+  live appointment nobody expects to be kept.
+
+  Verified end to end against real Cal: booking 14 two days out came back
+  `refunded` with Cal's row moving `accepted` → `cancelled` and a control
+  booking untouched; a second click returned 200 with exactly one refund and one
+  email; a booking moved inside the 24-hour window cancelled as `cancelled` with
+  no refund and mailed both the customer and the salon; a forged signature, a
+  valid signature pointed at a neighbouring id, and an unknown booking are all
+  404 and told apart nowhere the caller can see
+- **The browser suite earned its place a second time.** `/bokning` was permitted
+  in `SecurityConfig` and routed in the SPA and returned a plain 404, because
+  nothing reaches React until the path is also forwarded to `index.html` in
+  `WebConfig` — whose existing comment predicts exactly this mistake. Every
+  backend test passed throughout
+- **A salon hears when a slot comes free**, which is the first message this
+  system has ever sent to a salon rather than a customer. It reads
+  `provider.contact_email`, not `provider.email`: the latter is db/001's
+  marketing column and is null on every row, so the obvious query compiles,
+  runs, and silently never notifies anyone
+- 146 tests and 26 browser tests
 
 Sketch:
 
@@ -233,6 +269,17 @@ Sketch:
   hand-written interpretations, which proves the rules and not the prompt. Set a
   real `ANTHROPIC_API_KEY` with `MARKETPLACE_AI_ENABLED=true` and the first
   query is the first proof
+
+- **A salon still cannot cancel.** The console is read-only, so a salon that
+  needs to drop an appointment does it in Cal's own UI, and our `booking` row
+  goes on reading `confirmed` for something that no longer exists. The webhook
+  that marks availability stale does not touch `booking`. True before ADR 0014
+  and made more visible by it
+
+- **Nothing reads `needs_attention`.** A cancellation whose refund failed sets
+  the flag and logs loudly, and is then found by reading logs. The console's
+  attention screen shows stuck *attempts* and not stuck cancellations — the same
+  gap `availability_miss` has
 
 - Stripe is exercised only against `stripe-mock`, which validates request shape
   and nothing else. Real Swish redirection, webhook signatures, Connect
@@ -262,6 +309,7 @@ docker/                build-api-v2.sh — no published image exists
 seed/                  dev fixtures — cal-dev.sh seeds both sides
 docs/decisions/        ADRs — why, not what
 docs/design/           booking-funnel.md — the saga, stage by stage
+db/010                 consumer cancellation -- the terms, and what happened
 backend/               Spring Modulith: search, sync, booking, payments,
                        onboarding, console, signup, landing, notifications, geo,
                        ai (whether a model may be called; no agents live there),
@@ -335,16 +383,20 @@ In the order worth doing it:
 
 1. A Stripe test account, to verify the half that `stripe-mock` cannot: real
    Swish redirection, webhook signatures, Connect onboarding, payouts.
-2. A consumer identity. There is one consumer write endpoint and no way back to
-   a booking: no account, no history, no cancel, no reschedule. The `booking`
-   table already allows `cancelled` and `refunded` and nothing ever sets them,
-   which makes this the largest remaining gap in the product.
+2. Reschedule, and letting a salon cancel. ADR 0014 deliberately did neither.
+   Rescheduling is a cancel and a re-book against a live availability query,
+   with a failure the two halves do not have on their own; a salon cancelling
+   is a question about who owes the customer what.
 3. HTML email. The messages are plain text, which is honest and legible but
    not what a consumer brand ships.
+4. Read `needs_attention` and `availability_miss`. Both are written faithfully
+   and read by nothing, so a customer owed money is currently found by reading
+   logs.
 
 Done: the availability reconciler, the booking funnel with its compensations,
 Stripe Connect with the asynchronous payment path, provider onboarding,
-self-serve signup, geocoding, and the limit on the login endpoint.
+self-serve signup, geocoding, the limit on the login endpoint, and consumer
+cancellation.
 
 ## Known shape problems, recorded early
 
@@ -377,8 +429,8 @@ Backend-only builds pass `-Dskip.npm=true`, which is the default.
 
 ```bash
 cd backend
-mvn test              # 122 — logic, module boundaries, every compensation path
-npx playwright test   # 22 — what a person actually sees, needs a running stack
+mvn test              # 146 — logic, module boundaries, every compensation path
+npx playwright test   # 26 — what a person actually sees, needs a running stack
 ```
 
 The browser suite exists for one reason. The landing pages once returned
@@ -412,6 +464,7 @@ now listed on purpose in `console/SecurityConfig`. Four categories:
 | `/api/console/**` | authenticated, scoped to the session's provider |
 | `/api/signup/**` | anonymous, rate limited, and provisions nothing until a link sent to the address is clicked |
 | `POST /api/auth/login` | anonymous, and counted per source address before the password is checked |
+| `POST /api/bookings/lookup`, `/cancel` | anonymous, authorised by an HMAC in the body — never in a URL, so it stays out of access logs and `Referer` |
 | `POST /api/providers` | platform admin only — it creates the Cal and Stripe accounts immediately, which is exactly why the public path is `/api/signup` |
 
 Sessions rather than tokens: the SPA ships in the same jar, so the cookie is

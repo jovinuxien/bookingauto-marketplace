@@ -42,6 +42,11 @@ class WebConfig implements WebMvcConfigurer {
 		// permits but this list forgets returns Spring's own error page, and the
 		// permit reads as though the page works.
 		registry.addViewController("/verifiera").setViewName("forward:/index.html");
+		// The same, for the link in a confirmation email — and it was forgotten
+		// here first, exactly as the comment above predicts. Permitted in
+		// SecurityConfig, routed in the SPA, and a plain 404 in a browser,
+		// because nothing reaches React until this line exists.
+		registry.addViewController("/bokning").setViewName("forward:/index.html");
 	}
 
 }

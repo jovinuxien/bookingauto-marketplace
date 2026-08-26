@@ -55,12 +55,13 @@ class OutboxNotifier implements Notifier {
 			  %s
 			  %s
 
-			Behöver du avboka, svara på det här mejlet så hjälper salongen dig.
+			Behöver du avboka gör du det själv här:
+			%s
 
 			%s
 			""".formatted(
 				notice.customerName(), notice.providerName(), notice.serviceName(),
-				when, price(notice), publicUrl));
+				when, price(notice), notice.manageUrl(), publicUrl));
 	}
 
 	@Override
@@ -100,6 +101,62 @@ class OutboxNotifier implements Notifier {
 	}
 
 	@Override
+	public void bookingCancelled(BookingNotice notice, boolean refunded, int cutoffHours) {
+		if (refunded) {
+			enqueue(notice, "booking_cancelled_refunded",
+				"Din bokning hos " + notice.providerName() + " är avbokad",
+				"""
+				Hej %s,
+
+				Din tid %s hos %s är avbokad, och vi betalar tillbaka %s.
+
+				Återbetalningen syns normalt inom några minuter, beroende på bank.
+
+				Välkommen tillbaka när det passar:
+				%s
+				""".formatted(notice.customerName(), format(notice), notice.providerName(),
+					price(notice), publicUrl));
+			return;
+		}
+
+		// The money is not coming back, and the message says so in the first
+		// sentence rather than at the bottom. Someone who has to read to the end
+		// to find that out reads it as having been hidden.
+		enqueue(notice, "booking_cancelled",
+			"Din bokning hos " + notice.providerName() + " är avbokad",
+			"""
+			Hej %s,
+
+			Din tid %s hos %s är avbokad.
+
+			Avbokningen skedde senare än %d timmar före besöket, så beloppet
+			%s betalas inte tillbaka.
+
+			Välkommen tillbaka när det passar:
+			%s
+			""".formatted(notice.customerName(), format(notice), notice.providerName(),
+				cutoffHours, price(notice), publicUrl));
+	}
+
+	@Override
+	public void providerBookingCancelled(BookingNotice notice, String providerEmail) {
+		// Addressed to the salon, so the times are the salon's and the money is
+		// described as what they will not now be paid rather than as a refund.
+		enqueueTo(providerEmail, notice, "provider_booking_cancelled",
+			"Avbokad tid: " + format(notice),
+			"""
+			Hej,
+
+			%s har avbokat %s.
+
+			Tiden är ledig igen och kan bokas av någon annan.
+
+			Bokning: %s, %s
+			""".formatted(notice.customerName(), format(notice),
+				notice.serviceName(), price(notice)));
+	}
+
+	@Override
 	public void bookingNeedsAttention(BookingNotice notice) {
 		// Deliberately no "try again". This state means a compensation itself
 		// failed, so a second attempt could take a second payment.
@@ -116,8 +173,20 @@ class OutboxNotifier implements Notifier {
 	}
 
 	private void enqueue(BookingNotice notice, String kind, String subject, String body) {
+		enqueueTo(notice.customerEmail(), notice, kind, subject, body);
+	}
+
+	/**
+	 * The dedupe key is per kind as well as per event, so the salon's copy and
+	 * the customer's do not collide — they describe one cancellation and are two
+	 * messages, and a shared key would silently deliver whichever was written
+	 * first.
+	 */
+	private void enqueueTo(String recipient, BookingNotice notice, String kind,
+		String subject, String body) {
+
 		boolean written = repository.enqueue(new OutboxRepository.Message(
-			notice.dedupeKey(), kind, notice.customerEmail(), subject, body, null,
+			notice.dedupeKey() + ":" + kind, kind, recipient, subject, body, null,
 			notice.bookingId(), notice.providerId()));
 
 		if (!written) {

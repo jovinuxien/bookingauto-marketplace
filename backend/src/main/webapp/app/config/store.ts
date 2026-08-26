@@ -8,9 +8,10 @@ import booking from 'app/shared/reducers/booking.reducer';
 import auth from 'app/shared/reducers/auth.reducer';
 import consoleReducer from 'app/shared/reducers/console.reducer';
 import signup from 'app/shared/reducers/signup.reducer';
+import myBooking from 'app/shared/reducers/my-booking.reducer';
 
 const store = configureStore({
-  reducer: { search, provider, booking, auth, console: consoleReducer, signup },
+  reducer: { search, provider, booking, auth, console: consoleReducer, signup, myBooking },
 });
 
 export type RootState = ReturnType<typeof store.getState>;
