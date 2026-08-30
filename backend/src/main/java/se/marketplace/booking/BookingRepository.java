@@ -49,11 +49,11 @@ class BookingRepository {
 			INSERT INTO booking_attempt
 			  (idempotency_key, provider_id, service_id, slot_start,
 			   price_minor, commission_minor, currency,
-			   customer_email, customer_name, registration_number, state)
+			   customer_email, customer_name, registration_number, channel, state)
 			VALUES
 			  (:key, :providerId, :serviceId, :slotStart,
 			   :priceMinor, :commissionMinor, :currency,
-			   :email, :name, :plate, 'STARTED')
+			   :email, :name, :plate, :channel, 'STARTED')
 			""",
 			new MapSqlParameterSource()
 				.addValue("key", request.idempotencyKey())
@@ -65,7 +65,8 @@ class BookingRepository {
 				.addValue("currency", request.currency())
 				.addValue("email", request.customerEmail())
 				.addValue("name", request.customerName())
-				.addValue("plate", request.registrationNumber()),
+				.addValue("plate", request.registrationNumber())
+				.addValue("channel", request.channel()),
 			keys, new String[] { "id" });
 
 		long id = keys.getKey().longValue();
@@ -218,11 +219,12 @@ class BookingRepository {
 			INSERT INTO booking
 			  (provider_id, service_id, cal_booking_uid, starts_at, ends_at,
 			   customer_email, customer_name, price_minor, commission_minor, currency,
-			   cancellation_cutoff_hours, registration_number)
+			   cancellation_cutoff_hours, registration_number, channel)
 			VALUES
 			  (:providerId, :serviceId, :uid, :startsAt, :endsAt,
 			   :email, :name, :priceMinor, :commissionMinor, :currency,
-			   :cutoffHours, :plate)
+			   :cutoffHours, :plate,
+			   (SELECT a.channel FROM booking_attempt a WHERE a.id = :attemptId))
 			""",
 			new MapSqlParameterSource()
 				.addValue("providerId", attempt.providerId())
@@ -236,7 +238,8 @@ class BookingRepository {
 				.addValue("commissionMinor", attempt.commissionMinor())
 				.addValue("currency", attempt.currency())
 				.addValue("cutoffHours", cancellationCutoffHours)
-				.addValue("plate", attempt.registrationNumber()),
+				.addValue("plate", attempt.registrationNumber())
+				.addValue("attemptId", attempt.id()),
 			keys, new String[] { "id" });
 
 		long bookingId = keys.getKey().longValue();
@@ -656,7 +659,9 @@ class BookingRepository {
 		/** Normalised, or null when the category did not ask. */
 		String registrationNumber,
 		/** Chosen at checkout, already validated and priced. */
-		List<se.marketplace.pricing.Addon> addons
+		List<se.marketplace.pricing.Addon> addons,
+		/** 'marketplace' or 'widget', already validated. */
+		String channel
 	) {}
 
 }

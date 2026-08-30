@@ -47,6 +47,9 @@ class WebConfig implements WebMvcConfigurer {
 		// SecurityConfig, routed in the SPA, and a plain 404 in a browser,
 		// because nothing reaches React until this line exists.
 		registry.addViewController("/bokning").setViewName("forward:/index.html");
+		// The embeddable storefront (ADR 0018): framed on other people's sites,
+		// so it of all routes must never show Spring's error page.
+		registry.addViewController("/widget/{slug}").setViewName("forward:/index.html");
 	}
 
 }

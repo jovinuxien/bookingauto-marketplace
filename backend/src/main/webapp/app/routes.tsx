@@ -5,6 +5,7 @@ import Home from 'app/modules/home/home';
 import SearchResults from 'app/modules/search/search-results';
 import ProviderPage from 'app/modules/provider/provider-page';
 import Checkout from 'app/modules/booking/checkout';
+import WidgetPage from 'app/modules/widget/widget-page';
 import MyBooking from 'app/modules/booking/my-booking';
 import Login from 'app/modules/login/login';
 import Register from 'app/modules/signup/register';
@@ -26,6 +27,7 @@ const AppRoutes = () => (
     <Route path="/sok" element={<SearchResults />} />
     <Route path="/salong/:slug" element={<ProviderPage />} />
     <Route path="/boka/:serviceId" element={<Checkout />} />
+    <Route path="/widget/:slug" element={<WidgetPage />} />
 
     {/* The business side. Guarded here for rendering; enforced on the server. */}
     <Route path="/registrera" element={<Register />} />

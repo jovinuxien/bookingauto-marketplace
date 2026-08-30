@@ -36,6 +36,7 @@ class ConsoleRepository {
 	Summary summary(long providerId) {
 		return jdbc.queryForObject("""
 			SELECT p.name,
+			       p.slug,
 			       p.status,
 			       p.onboarding_state,
 			       p.payouts_enabled,
@@ -58,6 +59,7 @@ class ConsoleRepository {
 			new MapSqlParameterSource("id", providerId),
 			(ResultSet rs, int n) -> new Summary(
 				rs.getString("name"),
+				rs.getString("slug"),
 				rs.getString("status"),
 				rs.getString("onboarding_state"),
 				rs.getBoolean("payouts_enabled"),
@@ -135,6 +137,7 @@ class ConsoleRepository {
 	 */
 	record Summary(
 		String name,
+		String slug,
 		String status,
 		String onboardingState,
 		boolean payoutsEnabled,

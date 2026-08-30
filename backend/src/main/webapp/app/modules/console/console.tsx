@@ -117,6 +117,19 @@ const Console = () => {
         </div>
       )}
 
+      {summary && (
+        <>
+          <h2 className="h6 mt-5">Bokning på er egen webbplats</h2>
+          <p className="text-muted small mb-2">
+            Klistra in raden på er webbplats så visas era lediga tider där. Bokningen och
+            betalningen sker hos oss, som vanligt.
+          </p>
+          <pre className="bg-light border rounded p-2 small user-select-all"><code>
+            {`<script src="${window.location.origin}/widget.js" data-verkstad="${summary.slug}"></script>`}
+          </code></pre>
+        </>
+      )}
+
       <Pricing />
     </>
   );

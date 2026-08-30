@@ -7,6 +7,7 @@ export interface Session {
 
 export interface ConsoleSummary {
   name: string;
+  slug: string;
   status: string;
   onboardingState: string;
   payoutsEnabled: boolean;

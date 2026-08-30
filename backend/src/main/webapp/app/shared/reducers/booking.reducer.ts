@@ -15,6 +15,8 @@ export interface CheckoutRequest {
   quotedPriceMinor?: number;
   /** Add-ons ticked at checkout. */
   addonIds?: number[];
+  /** Where the checkout was opened from (ADR 0018). Reporting only. */
+  channel?: string;
 }
 
 interface BookingState {

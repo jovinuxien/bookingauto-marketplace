@@ -54,6 +54,32 @@ class SecurityConfig {
 		csrf.setCsrfRequestAttributeName(null);
 
 		http
+			// Framing: DENY everywhere, except the widget page, which exists to
+			// be framed (ADR 0018) and answers frame-ancestors * instead. The
+			// default writer is replaced by two path-scoped ones because one
+			// header cannot say both things.
+			.headers(headers -> {
+				// The header is written at response commit, which for an SPA
+				// route happens INSIDE the forward to /index.html -- by then
+				// getRequestURI() says /index.html for every page, and a path
+				// matcher can never see /widget/. The original path survives
+				// the forward only as a request attribute, so that is what is
+				// matched.
+				org.springframework.security.web.util.matcher.RequestMatcher widget = request -> {
+					Object forwarded = request.getAttribute("jakarta.servlet.forward.request_uri");
+					String uri = forwarded instanceof String s ? s : request.getRequestURI();
+					return uri.startsWith("/widget/");
+				};
+				headers.frameOptions(frame -> frame.disable());
+				headers.addHeaderWriter(new org.springframework.security.web.header.writers.DelegatingRequestMatcherHeaderWriter(
+					new org.springframework.security.web.util.matcher.NegatedRequestMatcher(widget),
+					new org.springframework.security.web.header.writers.frameoptions.XFrameOptionsHeaderWriter(
+						org.springframework.security.web.header.writers.frameoptions.XFrameOptionsHeaderWriter.XFrameOptionsMode.DENY)));
+				headers.addHeaderWriter(new org.springframework.security.web.header.writers.DelegatingRequestMatcherHeaderWriter(
+					widget,
+					new org.springframework.security.web.header.writers.StaticHeadersWriter(
+						"Content-Security-Policy", "frame-ancestors *")));
+			})
 			.csrf(it -> it
 				.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
 				.csrfTokenRequestHandler(csrf)
@@ -80,6 +106,9 @@ class SecurityConfig {
 			.authorizeHttpRequests(it -> it
 				// --- the SPA itself -------------------------------------------
 				.requestMatchers("/", "/index.html", "/assets/**", "/favicon.ico").permitAll()
+				// The embeddable storefront and its loader (ADR 0018). Public
+				// data on a public URL; the frame headers below are what differ.
+				.requestMatchers("/widget/**", "/widget.js").permitAll()
 				.requestMatchers("/sok", "/salong/**", "/boka/**", "/logga-in", "/konsol/**").permitAll()
 				.requestMatchers("/registrera", "/verifiera").permitAll()
 				// Where the link in a confirmation email lands.

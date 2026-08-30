@@ -172,7 +172,9 @@ public class BookingFunnel {
 			request.customerEmail(),
 			request.customerName(),
 			plate,
-			chosen));
+			chosen,
+			// Closed set, defaulted, never trusted for money or access.
+			"widget".equals(request.channel()) ? "widget" : "marketplace"));
 
 		return runSaga(attempt, service, request);
 	}
@@ -554,7 +556,9 @@ public class BookingFunnel {
 		/** What the page showed, so a rule edited since is refused rather than charged. Null = no check. */
 		Integer quotedPriceMinor,
 		/** Add-ons ticked at checkout, by id. Null or empty for none. */
-		List<Long> addonIds
+		List<Long> addonIds,
+		/** 'widget' when the checkout came from an embed (ADR 0018); anything else is 'marketplace'. */
+		String channel
 	) {}
 
 	/** The price is not what the page said. Carries what it is now. */

@@ -34,6 +34,8 @@ const Checkout = () => {
   // The price the salon page showed. Sent back so a rule changed since is a
   // 409 with the new number rather than a silent charge (ADR 0016).
   const shownPrice = params.get('pris') ? Number(params.get('pris')) : undefined;
+  // Where this checkout was opened from (ADR 0018). Reporting only.
+  const channel = params.get('kanal') === 'widget' ? 'widget' : undefined;
 
   const { outcome, submitting, error, priceNow } = useAppSelector(state => state.booking);
   const [name, setName] = useState('');
@@ -71,6 +73,7 @@ const Checkout = () => {
       ...(asksVehicle ? { registrationNumber: plate } : {}),
       ...(total !== undefined ? { quotedPriceMinor: total } : {}),
       ...(chosen.length > 0 ? { addonIds: chosen } : {}),
+      ...(channel ? { channel } : {}),
     }));
   };
 

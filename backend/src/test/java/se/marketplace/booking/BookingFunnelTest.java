@@ -87,12 +87,12 @@ class BookingFunnelTest {
 
 	private BookingFunnel.Outcome book() {
 		return funnel.book(new BookingFunnel.BookingRequest(
-			"key-1", 1L, SLOT, "Testkund", "test@example.se", null, null, null));
+			"key-1", 1L, SLOT, "Testkund", "test@example.se", null, null, null, null));
 	}
 
 	private BookingFunnel.Outcome bookWithPlate(String plate) {
 		return funnel.book(new BookingFunnel.BookingRequest(
-			"key-1", 1L, SLOT, "Testkund", "test@example.se", plate, null, null));
+			"key-1", 1L, SLOT, "Testkund", "test@example.se", plate, null, null, null));
 	}
 
 	// ------------------------------------------------------------ happy path --
@@ -161,7 +161,7 @@ class BookingFunnelTest {
 		when(vehicles.cached(any())).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> funnel.book(new BookingFunnel.BookingRequest(
-				"key-1", 1L, SLOT, "Testkund", "test@example.se", "ABC123", 49900, null)))
+				"key-1", 1L, SLOT, "Testkund", "test@example.se", "ABC123", 49900, null, null)))
 			.isInstanceOf(BookingFunnel.PriceChanged.class)
 			.satisfies(e -> assertThat(((BookingFunnel.PriceChanged) e).priceMinor()).isEqualTo(60000));
 		assertThat(repository.started).isNull();
@@ -175,7 +175,7 @@ class BookingFunnelTest {
 		when(vehicles.cached(any())).thenReturn(Optional.empty());
 
 		var outcome = funnel.book(new BookingFunnel.BookingRequest(
-			"key-1", 1L, SLOT, "Testkund", "test@example.se", "ABC123", 60000, null));
+			"key-1", 1L, SLOT, "Testkund", "test@example.se", "ABC123", 60000, null, null));
 
 		assertThat(outcome.sold()).isTrue();
 	}
@@ -187,11 +187,12 @@ class BookingFunnelTest {
 			new Addon(7L, 1L, "Spolarvätska", 4900), new Addon(8L, 1L, "Däckhotell", 89000)));
 
 		var outcome = funnel.book(new BookingFunnel.BookingRequest(
-			"key-1", 1L, SLOT, "Testkund", "test@example.se", null, 153900, List.of(7L, 8L)));
+			"key-1", 1L, SLOT, "Testkund", "test@example.se", null, 153900, List.of(7L, 8L), "widget"));
 
 		assertThat(outcome.sold()).isTrue();
 		assertThat(repository.started.priceMinor()).isEqualTo(60000 + 4900 + 89000);
 		assertThat(repository.startedWith.addons()).extracting(Addon::name).containsExactly("Spolarvätska", "Däckhotell");
+		assertThat(repository.startedWith.channel()).isEqualTo("widget");
 		// 15% of the total, not of the list price.
 		assertThat(repository.started.commissionMinor()).isEqualTo(Math.round(153900 * 0.15f));
 	}
@@ -202,7 +203,7 @@ class BookingFunnelTest {
 		when(addons.priced(1L, List.of(99L))).thenThrow(new IllegalArgumentException("Ett tillval finns inte längre."));
 
 		assertThatThrownBy(() -> funnel.book(new BookingFunnel.BookingRequest(
-				"key-1", 1L, SLOT, "Testkund", "test@example.se", null, null, List.of(99L))))
+				"key-1", 1L, SLOT, "Testkund", "test@example.se", null, null, List.of(99L), null)))
 			.isInstanceOf(IllegalArgumentException.class);
 		assertThat(cal.reserved).isZero();
 	}
@@ -213,6 +214,15 @@ class BookingFunnelTest {
 		bookWithPlate("ABC123");
 
 		assertThat(repository.started.registrationNumber()).isNull();
+	}
+
+	@Test
+	@DisplayName("an invented channel is 'marketplace', not an insert error")
+	void channelIsAClosedSet() {
+		funnel.book(new BookingFunnel.BookingRequest(
+			"key-1", 1L, SLOT, "Testkund", "test@example.se", null, null, null, "spoofed"));
+
+		assertThat(repository.startedWith.channel()).isEqualTo("marketplace");
 	}
 
 	@Test
