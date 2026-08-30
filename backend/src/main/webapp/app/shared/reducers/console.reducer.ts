@@ -4,6 +4,9 @@ import type { ApiError } from 'app/config/axios-interceptor';
 import type { AttentionItem, ConsoleBooking, ConsoleSummary } from 'app/shared/model/console.model';
 
 interface ConsoleState {
+  /** Per booking id, while its cancellation is in flight. */
+  cancellingId: number | null;
+  cancelNotice: string | null;
   summary: ConsoleSummary | null;
   bookings: ConsoleBooking[];
   attention: AttentionItem[];
@@ -12,6 +15,8 @@ interface ConsoleState {
 }
 
 const initialState: ConsoleState = {
+  cancellingId: null,
+  cancelNotice: null,
   summary: null,
   bookings: [],
   attention: [],
@@ -26,6 +31,20 @@ const initialState: ConsoleState = {
  * booking list without the payability banner above it can tell a salon it has
  * earned money it cannot yet be paid.
  */
+export const cancelAsProvider = createAsyncThunk<
+  { outcome: string; refunded: boolean; id: number },
+  number,
+  { rejectValue: ApiError }
+>('console/cancelBooking', async (id, { rejectWithValue, dispatch }) => {
+  try {
+    const response = await axios.post<{ outcome: string; refunded: boolean }>(`/console/bookings/${id}/cancel`);
+    void dispatch(loadConsole());
+    return { ...response.data, id };
+  } catch (error) {
+    return rejectWithValue(error as ApiError);
+  }
+});
+
 export const loadConsole = createAsyncThunk<
   { summary: ConsoleSummary; bookings: ConsoleBooking[]; attention: AttentionItem[] },
   void,
@@ -61,6 +80,23 @@ const consoleSlice = createSlice({
       .addCase(loadConsole.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload?.message ?? 'Kunde inte hämta konsolen.';
+      })
+      .addCase(cancelAsProvider.pending, (state, action) => {
+        state.cancellingId = action.meta.arg;
+        state.cancelNotice = null;
+      })
+      .addCase(cancelAsProvider.fulfilled, (state, action) => {
+        state.cancellingId = null;
+        state.cancelNotice =
+          action.payload.outcome === 'refund_pending'
+            ? 'Tiden är avbokad. Återbetalningen behandlas manuellt — kunden är informerad.'
+            : 'Tiden är avbokad och kunden får hela beloppet tillbaka.';
+      })
+      .addCase(cancelAsProvider.rejected, (state, action) => {
+        state.cancellingId = null;
+        state.cancelNotice = action.payload?.status === 409
+          ? 'Tiden har redan börjat och kan inte avbokas här.'
+          : 'Avbokningen gick inte igenom. Prova igen om en stund.';
       });
   },
   reducers: {},

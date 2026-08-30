@@ -381,6 +381,11 @@ class BookingRepository {
 				.addValue("endsAt", java.sql.Timestamp.from(endsAt)));
 	}
 
+	void markCancelledBy(long id, String who) {
+		jdbc.update("UPDATE booking SET cancelled_by = :who WHERE id = :id",
+			new MapSqlParameterSource().addValue("id", id).addValue("who", who));
+	}
+
 	void settleCancellation(long id, String status, String refundRef, boolean needsAttention) {
 		jdbc.update("""
 			UPDATE booking

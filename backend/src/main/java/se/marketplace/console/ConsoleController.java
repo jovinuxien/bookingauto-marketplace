@@ -24,10 +24,39 @@ import org.springframework.web.bind.annotation.RestController;
 class ConsoleController {
 
 	private final ConsoleRepository repository;
+	private final se.marketplace.booking.ProviderCancellation cancellation;
 
-	ConsoleController(ConsoleRepository repository) {
+	ConsoleController(ConsoleRepository repository,
+		se.marketplace.booking.ProviderCancellation cancellation) {
 		this.repository = repository;
+		this.cancellation = cancellation;
 	}
+
+	/**
+	 * The salon lets a time go. The refund is unconditional — see
+	 * {@link se.marketplace.booking.ProviderCancellation} for why — and the
+	 * body says whether the money moved or a human has to move it.
+	 */
+	@org.springframework.web.bind.annotation.PostMapping("/bookings/{id}/cancel")
+	ResponseEntity<?> cancelBooking(@AuthenticationPrincipal ConsolePrincipal principal,
+		@org.springframework.web.bind.annotation.PathVariable long id) {
+		return switch (cancellation.cancel(principal.providerId(), id)) {
+			case se.marketplace.booking.ProviderCancellation.Cancelled c ->
+				ResponseEntity.ok(new CancelOutcome("cancelled", c.refunded()));
+			case se.marketplace.booking.ProviderCancellation.RefundStuck ignored ->
+				ResponseEntity.ok(new CancelOutcome("refund_pending", false));
+			case se.marketplace.booking.ProviderCancellation.AlreadyCancelled ignored ->
+				ResponseEntity.ok(new CancelOutcome("already_cancelled", false));
+			case se.marketplace.booking.ProviderCancellation.TooLate ignored ->
+				ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT).build();
+			case se.marketplace.booking.ProviderCancellation.Unavailable ignored ->
+				ResponseEntity.status(org.springframework.http.HttpStatus.BAD_GATEWAY).build();
+			case se.marketplace.booking.ProviderCancellation.Unknown ignored ->
+				ResponseEntity.notFound().build();
+		};
+	}
+
+	record CancelOutcome(String outcome, boolean refunded) {}
 
 	/** The salon's own summary: is it sellable, and what is it owed. */
 	@GetMapping("/summary")

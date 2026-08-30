@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Pricing from 'app/modules/console/pricing';
 
 import { useAppDispatch, useAppSelector } from 'app/config/store';
-import { loadConsole } from 'app/shared/reducers/console.reducer';
+import { cancelAsProvider, loadConsole } from 'app/shared/reducers/console.reducer';
 import { formatDay, formatPrice, formatTime } from 'app/shared/util/format';
 import type { ConsoleSummary } from 'app/shared/model/console.model';
 
@@ -14,7 +14,10 @@ import type { ConsoleSummary } from 'app/shared/model/console.model';
  */
 const Console = () => {
   const dispatch = useAppDispatch();
-  const { summary, bookings, attention, loading, error } = useAppSelector(state => state.console);
+  const { summary, bookings, attention, loading, error, cancellingId, cancelNotice } =
+    useAppSelector(state => state.console);
+  /** The row whose Avboka is awaiting a second click. One at a time. */
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
 
   useEffect(() => {
     dispatch(loadConsole());
@@ -56,6 +59,7 @@ const Console = () => {
       </div>
 
       <h2 className="h6 mt-4">Kommande</h2>
+      {cancelNotice && <div className="alert alert-info py-2">{cancelNotice}</div>}
       {bookings.length === 0 && <p className="text-muted">Inga bokningar ännu.</p>}
       {bookings.length > 0 && (
         <div className="table-responsive">
@@ -63,7 +67,7 @@ const Console = () => {
             <thead>
               <tr>
                 <th>När</th><th>Tjänst</th><th>Kund</th>
-                <th className="text-end">Pris</th><th className="text-end">Avgift</th>
+                <th className="text-end">Pris</th><th className="text-end">Avgift</th><th></th>
               </tr>
             </thead>
             <tbody>
@@ -85,6 +89,26 @@ const Console = () => {
                   <td className="text-end">{formatPrice(booking.priceMinor, booking.currency)}</td>
                   <td className="text-end text-muted">
                     {formatPrice(booking.commissionMinor, booking.currency)}
+                  </td>
+                  <td className="text-end">
+                    {/* Only times that have not started, and never while one is in flight. */}
+                    {booking.status === 'confirmed' && new Date(booking.startsAt) > new Date() && (
+                      confirmingId === booking.id ? (
+                        <span className="text-nowrap">
+                          <span className="small me-1">Kunden får pengarna tillbaka.</span>
+                          <button className="btn btn-sm btn-danger" type="button" disabled={cancellingId !== null}
+                            onClick={() => { dispatch(cancelAsProvider(booking.id)); setConfirmingId(null); }}>
+                            {cancellingId === booking.id ? 'Avbokar…' : 'Ja, avboka'}
+                          </button>
+                          <button className="btn btn-sm btn-link" type="button" onClick={() => setConfirmingId(null)}>Ångra</button>
+                        </span>
+                      ) : (
+                        <button className="btn btn-sm btn-outline-danger" type="button"
+                          onClick={() => setConfirmingId(booking.id)}>
+                          Avboka
+                        </button>
+                      )
+                    )}
                   </td>
                 </tr>
               ))}

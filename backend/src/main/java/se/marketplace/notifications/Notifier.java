@@ -70,6 +70,12 @@ public interface Notifier {
 	 */
 	void bookingNeedsAttention(BookingNotice notice);
 
+	/**
+	 * The salon cancelled — an apology, and the money. {@code refunded} false
+	 * means the refund needs a human and the customer is told it is coming.
+	 */
+	void bookingCancelledByProvider(BookingNotice notice, boolean refunded);
+
 	/** The customer moved the time. The notice carries the new time; {@code from} is the old one. */
 	void bookingRescheduled(BookingNotice notice, java.time.Instant from);
 

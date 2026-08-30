@@ -183,6 +183,30 @@ class OutboxNotifier implements Notifier {
 	}
 
 	@Override
+	public void bookingCancelledByProvider(BookingNotice notice, boolean refunded) {
+		enqueue(notice, "booking_cancelled_by_provider",
+			notice.providerName() + " har tyvärr avbokat din tid",
+			"""
+			Hej %s,
+
+			%s har tyvärr behövt avboka din tid:
+
+			  %s
+			  %s
+
+			%s
+
+			Vi beklagar. Boka gärna en ny tid när det passar:
+			%s
+			""".formatted(notice.customerName(), notice.providerName(),
+				notice.serviceName(), format(notice),
+				refunded
+					? "Hela beloppet, " + price(notice) + ", betalas tillbaka till ditt kort."
+					: "Återbetalningen av " + price(notice) + " behandlas manuellt och är på väg.",
+				publicUrl));
+	}
+
+	@Override
 	public void bookingRescheduled(BookingNotice notice, java.time.Instant from) {
 		enqueue(notice, "booking_rescheduled",
 			"Din tid hos " + notice.providerName() + " är flyttad",

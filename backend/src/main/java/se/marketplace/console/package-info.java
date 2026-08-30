@@ -17,5 +17,5 @@
  */
 @org.springframework.modulith.ApplicationModule(
 	displayName = "Console",
-	allowedDependencies = { "ratelimit", "categories", "vehicles", "pricing" })
+	allowedDependencies = { "ratelimit", "categories", "vehicles", "pricing", "booking" })
 package se.marketplace.console;

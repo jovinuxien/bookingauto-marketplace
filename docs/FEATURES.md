@@ -49,6 +49,7 @@ Last revised: 2026-08-30.
 | 3.5 | **Console**: summary (earned, commission, upcoming), upcoming bookings with customer, plate and — once looked up — make/model/year/tyres, and a list of attempts needing a human | `GET /api/console/*`, `/konsol` |
 | 3.6 | Console **login** with lockout after repeated failures; owner and platform-admin roles; owner can add users | `/api/auth/login`, `/api/console/users` |
 | 3.7 | **Work-order e-mail on every sale** with the registration number; e-mail on customer cancellation | `provider_booking_confirmed`, `provider_booking_cancelled` (db/014) |
+| 3.9 | **Provider-initiated cancellation**: the salon lets a time go from the console — the refund is unconditional (the cutoff protects providers from customers, not from themselves), the slot is released in Cal, the customer gets an apology mail with the money on its way, and `cancelled_by` records who let go | `POST /api/console/bookings/{id}/cancel`, db/022 |
 | 3.8 | **Automatic geocoding** of the address after signup (sweep, bounded retries, never guesses a city centroid); operator can place by hand | `geo` (db/008) |
 
 ## 4. Vehicles (bil & däck)
@@ -80,5 +81,4 @@ Last revised: 2026-08-30.
 ## Not built (so nobody assumes it)
 
 
-Provider-initiated cancellation · workshop widget · messaging ·
-provider subscription tiers · mobile app · consumer accounts (by design, ADR 0014).
+Workshop widget · messaging · provider subscription tiers · mobile app · consumer accounts (by design, ADR 0014).

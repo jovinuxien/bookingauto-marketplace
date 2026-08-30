@@ -379,6 +379,11 @@ class BookingCancellationTest {
 		}
 
 		@Override
+		void markCancelledBy(long id, String who) {
+			// recorded nowhere: who cancelled is asserted through the notices
+		}
+
+		@Override
 		boolean claimForCancellation(long id) {
 			claims++;
 
@@ -512,6 +517,11 @@ class BookingCancellationTest {
 
 		@Override
 		public void bookingRefunded(BookingNotice notice, String reason) {
+		}
+
+		@Override
+		public void bookingCancelledByProvider(BookingNotice notice, boolean refunded) {
+			// not exercised here
 		}
 
 		@Override

@@ -140,6 +140,7 @@ public class BookingCancellation {
 				.orElseGet(Unknown::new);
 		}
 
+		repository.markCancelledBy(booking.id(), "customer");
 		return finish(booking, now);
 	}
 
