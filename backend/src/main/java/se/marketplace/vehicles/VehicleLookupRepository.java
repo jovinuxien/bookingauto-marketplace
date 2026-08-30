@@ -53,6 +53,8 @@ class VehicleLookupRepository {
 			   SET vehicle_make = :make,
 			       vehicle_model = :model,
 			       vehicle_model_year = :year,
+			       vehicle_tyre_front = :tyreFront,
+			       vehicle_tyre_rear = :tyreRear,
 			       vehicle_lookup_attempts = vehicle_lookup_attempts + 1,
 			       vehicle_lookup_attempted_at = now(),
 			       vehicle_lookup_failure = NULL,
@@ -63,7 +65,9 @@ class VehicleLookupRepository {
 				.addValue("id", bookingId)
 				.addValue("make", vehicle.make())
 				.addValue("model", vehicle.model())
-				.addValue("year", vehicle.modelYear()));
+				.addValue("year", vehicle.modelYear())
+				.addValue("tyreFront", vehicle.tyreFront())
+				.addValue("tyreRear", vehicle.tyreRear()));
 	}
 
 	void recordFailure(long bookingId, String reason) {

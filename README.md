@@ -315,12 +315,13 @@ db/012                 the salon says what it sells; the import believes it
 db/013                 which car is coming -- the plate, and a port for the rest
 db/014                 the workshop hears about a sale, with the plate on it
 db/015                 cykel, and generic words belong to nobody
+db/016                 the tyre dimension, front and rear -- why TIC was chosen
 backend/               Spring Modulith: search, sync, booking, payments,
                        onboarding, console, signup, landing, notifications, geo,
                        ai (whether a model may be called; no agents live there),
                        ratelimit (a bucket, a window and a count),
                        categories (what a salon sells, and its URL),
-                       vehicles (which car is coming; a port with no vendor yet)
+                       vehicles (which car is coming; TIC behind a port, off until keyed)
   src/main/webapp/app/ React SPA — config/, shared/, modules/; built into the jar
 ```
 

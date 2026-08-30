@@ -72,7 +72,8 @@ class ConsoleRepository {
 			SELECT b.id, b.starts_at, b.ends_at, b.customer_name, b.customer_email,
 			       b.price_minor, b.commission_minor, b.currency, b.status,
 			       b.cal_booking_uid, s.name AS service_name,
-			       b.registration_number, b.vehicle_make, b.vehicle_model, b.vehicle_model_year
+			       b.registration_number, b.vehicle_make, b.vehicle_model, b.vehicle_model_year,
+			       b.vehicle_tyre_front, b.vehicle_tyre_rear
 			  FROM booking b
 			  JOIN service s ON s.id = b.service_id
 			 WHERE b.provider_id = :id
@@ -168,7 +169,11 @@ class ConsoleRepository {
 		String model = rs.getString("vehicle_model");
 		int year = rs.getInt("vehicle_model_year");
 		String name = model == null ? make : make + " " + model;
-		return rs.wasNull() ? name : name + " (" + year + ")";
+		String car = rs.wasNull() ? name : name + " (" + year + ")";
+		// The tyres, which is what a däckverkstad reads first: "Volvo V70 (2016) · 205/55R16".
+		String tyres = new se.marketplace.vehicles.Vehicle(make, model, null,
+			rs.getString("vehicle_tyre_front"), rs.getString("vehicle_tyre_rear")).tyres();
+		return tyres == null ? car : car + " · " + tyres;
 	}
 
 	record AttentionRow(

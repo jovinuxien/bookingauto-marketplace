@@ -192,6 +192,18 @@ marketplace:
     # adapter behind VehicleRegistryPort and one value here.
     registry: ${MARKETPLACE_VEHICLES_REGISTRY:none}
 
+    # 'tic' -- The Intelligence Company, a mirror of Transportstyrelsen's
+    # register with the tyre dimensions, which is the field that made it
+    # worth choosing. One endpoint, one header. The plan is metered (60 a
+    # minute, 3 000 a month on the entry tier), and the sweep's batch size
+    # and interval above are what keep a busy December inside it.
+    tic:
+      base-url: ${MARKETPLACE_VEHICLES_TIC_URL:https://api.tic.io}
+      # Never in the URL. TIC accepts ?key= and says in its own docs that
+      # it ends up in every log between here and there; the header does not.
+      api-key: ${MARKETPLACE_VEHICLES_TIC_API_KEY:}
+      timeout-seconds: ${MARKETPLACE_VEHICLES_TIC_TIMEOUT_SECONDS:10}
+
     # Bounded retry, as for geocoding: a plate the registry does not know is
     # almost always a typo, and a typo is not fixed by asking a fourth time.
     max-attempts: ${MARKETPLACE_VEHICLES_MAX_ATTEMPTS:3}

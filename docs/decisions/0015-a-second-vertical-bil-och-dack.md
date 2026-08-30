@@ -153,10 +153,17 @@ hierarchy" — worth watching, not worth solving yet.
 
 ## Watch items
 
-- **No registry answers yet.** `vehicle_make` stays null on every booking
-  until a vendor is chosen and an adapter written. The plate is the useful
-  part and it is there from the first booking; the sweep is the mechanism
-  waiting for something to sweep with.
+- **The registry is TIC, and it is off until there is a key.** Chosen over
+  Biluppgifter and car.info for one field — the tyre dimension, front and
+  rear (`db/016`) — which is the thing a däckverkstad wants on the rack
+  before the car arrives. `TicVehicleRegistry` is one endpoint behind the
+  port, selected by `marketplace.vehicles.registry=tic` and a key in
+  `MARKETPLACE_VEHICLES_TIC_API_KEY`. The entry plan is metered (60/min,
+  3 000/month); the sweep's batch and interval are what keep December
+  inside it, and 429 stops a pass rather than burning through the rest.
+  The field names are mapped from TIC's documentation in both its spellings
+  and have not yet been checked against a live response — the first thing
+  to do with a key is look up one known car and read the log line.
 - **Synonym collisions across verticals.** `vaxning` is skincare and also
   what a detailer does to paint; it stays with `hud`, and car wax is
   `lackskydd` / `polering`. Generic words (`service`, `reparation`) belong

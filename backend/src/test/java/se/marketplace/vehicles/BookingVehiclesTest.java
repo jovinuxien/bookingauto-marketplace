@@ -33,7 +33,7 @@ import se.marketplace.vehicles.VehicleRegistryPort.RegistryUnavailable;
  */
 class BookingVehiclesTest {
 
-	private static final Vehicle V70 = new Vehicle("Volvo", "V70", 2016);
+	private static final Vehicle V70 = new Vehicle("Volvo", "V70", 2016, "205/55R16", "205/55R16");
 
 	private VehicleLookupRepository repository;
 	private StubRegistry registry;
