@@ -21,7 +21,7 @@ import java.util.Locale;
  * ones on Transportstyrelsen's page, and the copy hedges "vid vinterväglag"
  * exactly where the law does.
  */
-final class TyreSeason {
+public final class TyreSeason {
 
 	private static final MonthDay STUDS_ALLOWED_FROM = MonthDay.of(10, 1);
 	private static final MonthDay WINTER_TYRES_FROM = MonthDay.of(12, 1);
@@ -82,13 +82,18 @@ final class TyreSeason {
 	 * @param deadline the date the copy is about — what a page can render as
 	 *        "senast" and a search engine can read as an event
 	 */
-	record Notice(String heading, String body, LocalDate deadline) {
+	public record Notice(String heading, String body, LocalDate deadline) {
 
 		private static final DateTimeFormatter SWEDISH =
 			DateTimeFormatter.ofPattern("d MMMM", Locale.forLanguageTag("sv"));
 
-		/** "1 december" — formatted here rather than in the template, which may not construct a Locale. */
-		String deadlineText() {
+		/**
+		 * "1 december" — formatted here rather than in the template, which may
+		 * not construct a Locale. Public, and so is the record and the class,
+		 * because the template reaches it by reflection: package-private was
+		 * fine for heading() and cut the page off at this line.
+		 */
+		public String deadlineText() {
 			return SWEDISH.format(deadline);
 		}
 
