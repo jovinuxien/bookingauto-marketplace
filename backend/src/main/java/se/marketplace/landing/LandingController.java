@@ -42,7 +42,7 @@ class LandingController {
 	 * migration and a word here. Getting half of it done is now noticed at boot
 	 * rather than by a 404 nobody is watching.
 	 */
-	static final String CATEGORY_PATHS = "frisor|massage|hudvard";
+	static final String CATEGORY_PATHS = "frisor|massage|hudvard|dackbyte|bilservice|bilvard|bilglas";
 
 	private final LandingRepository repository;
 	private final ViteManifest manifest;
