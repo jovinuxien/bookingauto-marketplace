@@ -30,6 +30,16 @@ interface SalonProvisioning {
 	boolean slugAvailable(String slug);
 
 	/**
+	 * The category as the database spells it, if {@code slug} is one we sell.
+	 *
+	 * <p>Asked here, beside {@link #slugAvailable}, because it is the same kind
+	 * of question: signup validating a form against what the rest of the
+	 * system knows. Empty for anything unknown or retired, and the form says so
+	 * next to the field.
+	 */
+	java.util.Optional<String> knownCategory(String slug);
+
+	/**
 	 * Creates the provider, its Cal account and its Stripe account.
 	 *
 	 * <p>Resumable: called again after a partial failure it continues rather
@@ -50,7 +60,9 @@ interface SalonProvisioning {
 		String addressLine,
 		String postalCode,
 		String email,
-		String calPassword
+		String calPassword,
+		/** What the salon said it sells. Becomes its default at import. */
+		String category
 	) {}
 
 	/**

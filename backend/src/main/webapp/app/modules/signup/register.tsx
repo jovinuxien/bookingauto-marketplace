@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { useAppDispatch, useAppSelector } from 'app/config/store';
 import { register } from 'app/shared/reducers/signup.reducer';
-import type { Registration } from 'app/shared/model/signup.model';
+import axios from 'app/config/axiosinstance';
+import type { CategoryChoice, Registration } from 'app/shared/model/signup.model';
 
 const EMPTY: Registration = {
   salonName: '',
@@ -12,6 +13,7 @@ const EMPTY: Registration = {
   addressLine: '',
   postalCode: '',
   city: '',
+  category: '',
 };
 
 /**
@@ -26,8 +28,22 @@ const Register = () => {
   const dispatch = useAppDispatch();
   const { submitting, submitted, problems, error } = useAppSelector(state => state.signup);
   const [form, setForm] = useState<Registration>(EMPTY);
+  // Fetched rather than written here: the server validates the choice
+  // against the same table, and a list copied into the frontend would be
+  // one more place for it to drift from. Empty until it arrives, and the
+  // select stays usable with no options so a slow answer is a slow answer
+  // rather than a broken form.
+  const [choices, setChoices] = useState<CategoryChoice[]>([]);
 
-  const set = (field: keyof Registration) => (event: React.ChangeEvent<HTMLInputElement>) =>
+  useEffect(() => {
+    axios.get<CategoryChoice[]>('/categories').then(
+      response => setChoices(response.data),
+      () => setChoices([]),
+    );
+  }, []);
+
+  const set = (field: keyof Registration) =>
+    (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm({ ...form, [field]: event.target.value });
 
   const submit = (event: React.FormEvent) => {
@@ -67,6 +83,23 @@ const Register = () => {
           <Field id="salonName" label="Salongens namn" value={form.salonName}
             onChange={set('salonName')} problem={problems.salonName} autoComplete="organization" />
 
+          <div className="mb-3">
+            <label className="form-label" htmlFor="category">Vad erbjuder ni?</label>
+            <select
+              id="category"
+              className={problems.category ? 'form-select is-invalid' : 'form-select'}
+              value={form.category}
+              onChange={set('category')}
+            >
+              <option value="">Välj…</option>
+              {choices.map(choice => (
+                <option key={choice.slug} value={choice.slug}>{choice.label}</option>
+              ))}
+            </select>
+            {problems.category
+              ? <div className="invalid-feedback">{problems.category}</div>
+              : <div className="form-text">Tjänster vi inte känner igen på namnet hamnar här.</div>}
+          </div>
           <Field id="addressLine" label="Gatuadress" value={form.addressLine}
             onChange={set('addressLine')} problem={problems.addressLine}
             autoComplete="street-address" />

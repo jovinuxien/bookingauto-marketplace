@@ -33,7 +33,7 @@ class OnboardingController {
 			var onboarded = onboarding.start(new ProviderOnboarding.NewProvider(
 				request.slug(), request.name(), request.city(), request.addressLine(),
 				request.postalCode(), request.email(), request.calPassword(),
-				request.longitude(), request.latitude()));
+				request.defaultCategory(), request.longitude(), request.latitude()));
 			return ResponseEntity.status(HttpStatus.CREATED).body(onboarded);
 		}
 		catch (ProviderOnboarding.AlreadyOnCal | ProviderOnboarding.AlreadyOnboarded e) {
@@ -67,6 +67,8 @@ class OnboardingController {
 		String postalCode,
 		String email,
 		String calPassword,
+		/** Optional. Absent means the configured default, as before. */
+		String defaultCategory,
 		Double longitude,
 		Double latitude
 	) {}

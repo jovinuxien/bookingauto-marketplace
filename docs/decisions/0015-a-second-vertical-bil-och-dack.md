@@ -82,11 +82,12 @@ what comes later without renumbering.
   dimension. That is one attribute on the attempt and one lookup, and it is
   its own decision — this ADR is about whether the categories fit, and they
   fit without it.
-- **A per-vertical default category.** `marketplace.onboarding.default-category`
-  is `har`, and a workshop whose event types match nothing becomes a
-  hairdresser. ADR 0013's watch item already names this. The right fix is a
-  default chosen at signup rather than in configuration, and it becomes urgent
-  the day the first workshop onboards — not before.
+- **A per-vertical default category** — deferred here, then done first, in
+  `db/012`: the signup form asks what the salon sells, the answer becomes
+  `provider.default_category_slug`, and the import prefers it over the
+  configured `har`. Without it a workshop whose event types match nothing
+  became a hairdresser, which is the one thing that had to be wrong before
+  any workshop could onboard.
 - **Seasonal copy.** `/dackbyte/stockholm` should say the dates. The label
   column holds a name, not a paragraph, and where seasonal copy lives is a
   landing-page question.
@@ -147,9 +148,9 @@ hierarchy" — worth watching, not worth solving yet.
   `lackskydd` / `polering`. `service` on its own is claimed by `bilservice`
   because "Service 15 000 km" is how workshops name the thing, and no salon
   names an event type "Service". The day one does, the import result shows it.
-- **The default.** Until the signup-time default exists, a workshop's
-  unmatched event types are hairdressing. Visible in the import result the
-  operator already sees; nothing makes them look.
+- **The default, for operators.** Self-serve providers choose one; an
+  operator creating a provider by hand may leave it out and gets the
+  configured `har`. Visible in the import result; nothing makes them look.
 - **`db/011` is applied by hand**, like everything from 002 onwards. It only
   inserts rows, so running the application first costs nothing worse than a
   boot warning about four routes with no category.

@@ -310,6 +310,8 @@ seed/                  dev fixtures — cal-dev.sh seeds both sides
 docs/decisions/        ADRs — why, not what
 docs/design/           booking-funnel.md — the saga, stage by stage
 db/010                 consumer cancellation -- the terms, and what happened
+db/011                 bil & däck -- four categories, ADR 0015
+db/012                 the salon says what it sells; the import believes it
 backend/               Spring Modulith: search, sync, booking, payments,
                        onboarding, console, signup, landing, notifications, geo,
                        ai (whether a model may be called; no agents live there),

@@ -2,6 +2,10 @@ package se.marketplace.signup;
 
 import org.springframework.stereotype.Component;
 
+import java.util.Optional;
+
+import se.marketplace.categories.Categories;
+import se.marketplace.categories.Category;
 import se.marketplace.console.ProviderLogins;
 import se.marketplace.onboarding.ProviderOnboarding;
 
@@ -18,10 +22,13 @@ class OnboardingProvisioning implements SalonProvisioning {
 
 	private final ProviderOnboarding onboarding;
 	private final ProviderLogins logins;
+	private final Categories categories;
 
-	OnboardingProvisioning(ProviderOnboarding onboarding, ProviderLogins logins) {
+	OnboardingProvisioning(ProviderOnboarding onboarding, ProviderLogins logins,
+		Categories categories) {
 		this.onboarding = onboarding;
 		this.logins = logins;
+		this.categories = categories;
 	}
 
 	@Override
@@ -40,11 +47,16 @@ class OnboardingProvisioning implements SalonProvisioning {
 	}
 
 	@Override
+	public Optional<String> knownCategory(String slug) {
+		return slug == null ? Optional.empty() : categories.bySlug(slug).map(Category::slug);
+	}
+
+	@Override
 	public Provisioned provision(NewSalon salon) {
 		try {
 			var onboarded = onboarding.start(new ProviderOnboarding.NewProvider(
 				salon.slug(), salon.salonName(), salon.city(), salon.addressLine(),
-				salon.postalCode(), salon.email(), salon.calPassword(),
+				salon.postalCode(), salon.email(), salon.calPassword(), salon.category(),
 				// No coordinates. Nothing here geocodes an address yet, so a
 				// self-serve salon is reachable from its city page and invisible
 				// to a radius search until someone places it. Left null rather

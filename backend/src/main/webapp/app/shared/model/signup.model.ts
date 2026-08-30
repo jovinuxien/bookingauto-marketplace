@@ -6,6 +6,14 @@ export interface Registration {
   addressLine: string;
   postalCode: string;
   city: string;
+  /** A category slug from /api/categories. */
+  category: string;
+}
+
+/** One entry of the list the server accepts for `category`. */
+export interface CategoryChoice {
+  slug: string;
+  label: string;
 }
 
 /** Field name to message, rendered next to the input that caused it. */

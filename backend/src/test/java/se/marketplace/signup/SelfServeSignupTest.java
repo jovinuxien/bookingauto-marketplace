@@ -67,7 +67,7 @@ class SelfServeSignupTest {
 
 	private SelfServeSignup.Registration form() {
 		return new SelfServeSignup.Registration("Klipp & Co", "anna@klippco.se",
-			"ett-riktigt-langt-losenord", "Storgatan 1", "112 34", "Stockholm");
+			"ett-riktigt-langt-losenord", "Storgatan 1", "112 34", "Stockholm", "har");
 	}
 
 	private SelfServeSignup.Outcome register() {
@@ -111,6 +111,8 @@ class SelfServeSignupTest {
 		assertThat(result).isInstanceOf(SelfServeSignup.Ready.class);
 		assertThat(provisioning.provisioned).hasSize(1);
 		assertThat(provisioning.provisioned.get(0).slug()).isEqualTo("klipp-och-co");
+		// The choice made on the form is the one the provider is created with.
+		assertThat(provisioning.provisioned.get(0).category()).isEqualTo("har");
 		assertThat(provisioning.loginsCreated).containsExactly("anna@klippco.se");
 		assertThat(repository.completed).containsExactly(1L);
 		assertThat(notifier.kinds()).containsExactly("verification", "welcome");
@@ -199,7 +201,7 @@ class SelfServeSignupTest {
 		// What this defends against is a script, and a script does not send
 		// valid forms. Counting only valid ones would leave the endpoint open
 		// to anything that sends nonsense quickly.
-		signup.register(new SelfServeSignup.Registration(null, null, null, null, null, null), IP);
+		signup.register(new SelfServeSignup.Registration(null, null, null, null, null, null, null), IP);
 
 		assertThat(limiter.counted).contains("signup:ip:" + IP);
 	}
@@ -341,12 +343,12 @@ class SelfServeSignupTest {
 	@DisplayName("field problems come back per field")
 	void validation() {
 		var outcome = signup.register(new SelfServeSignup.Registration(
-			"A", "not-an-email", "kort", "", "12345678", ""), IP);
+			"A", "not-an-email", "kort", "", "12345678", "", ""), IP);
 
 		Map<String, String> problems = ((SelfServeSignup.Rejected) outcome).problems();
 
 		assertThat(problems).containsOnlyKeys(
-			"salonName", "email", "password", "city", "addressLine", "postalCode");
+			"salonName", "email", "password", "city", "category", "addressLine", "postalCode");
 		assertThat(repository.created).isEmpty();
 	}
 
@@ -381,10 +383,49 @@ class SelfServeSignupTest {
 		assertThat(((SelfServeSignup.Rejected) outcome).problems()).containsKey("salonName");
 	}
 
+	/**
+	 * The category is checked against the list, not trusted.
+	 *
+	 * <p>It is where every service the salon imports lands when its name says
+	 * nothing we recognise, so a made-up one would be a foreign key failure at
+	 * the moment the person clicks the link -- hours after the form -- and an
+	 * omitted one would be the configured default, which is hairdressing
+	 * whatever the salon does (ADR 0015).
+	 */
+	@Test
+	@DisplayName("the category must be one we sell")
+	void categoryIsChecked() {
+		SelfServeSignup.Registration form = form();
+
+		var unknown = signup.register(new SelfServeSignup.Registration(form.salonName(),
+			form.email(), form.password(), form.addressLine(), form.postalCode(), form.city(),
+			"bilar"), IP);
+		var missing = signup.register(new SelfServeSignup.Registration(form.salonName(),
+			form.email(), form.password(), form.addressLine(), form.postalCode(), form.city(),
+			null), IP);
+
+		assertThat(((SelfServeSignup.Rejected) unknown).problems()).containsOnlyKeys("category");
+		assertThat(((SelfServeSignup.Rejected) missing).problems()).containsOnlyKeys("category");
+		assertThat(repository.created).isEmpty();
+	}
+
+	@Test
+	@DisplayName("the category is stored as the table spells it")
+	void categoryIsCanonicalised() {
+		SelfServeSignup.Registration form = form();
+
+		signup.register(new SelfServeSignup.Registration(form.salonName(), form.email(),
+			form.password(), form.addressLine(), form.postalCode(), form.city(), " HAR "), IP);
+
+		assertThat(repository.created).hasSize(1);
+		assertThat(repository.created.get(0).category()).isEqualTo("har");
+	}
+
 	private Map<String, String> problemsFor(String postalCode) {
 		SelfServeSignup.Registration form = form();
 		var outcome = signup.register(new SelfServeSignup.Registration(form.salonName(),
-			form.email(), form.password(), form.addressLine(), postalCode, form.city()), IP);
+			form.email(), form.password(), form.addressLine(), postalCode, form.city(),
+			form.category()), IP);
 
 		return outcome instanceof SelfServeSignup.Rejected rejected ? rejected.problems() : Map.of();
 	}
@@ -414,6 +455,14 @@ class SelfServeSignupTest {
 		@Override
 		public boolean slugAvailable(String slug) {
 			return !takenSlugs.contains(slug);
+		}
+
+		@Override
+		public Optional<String> knownCategory(String slug) {
+			// The three seeded categories, spelled the way the table spells them.
+			return Set.of("har", "massage", "hud").stream()
+				.filter(known -> known.equalsIgnoreCase(slug))
+				.findFirst();
 		}
 
 		@Override
@@ -523,7 +572,7 @@ class SelfServeSignupTest {
 				if (signup.tokenHash().equals(tokenHash)) {
 					return Optional.of(new Claimed(i + 1, signup.email(), signup.salonName(),
 						signup.slug(), signup.addressLine(), signup.postalCode(), signup.city(),
-						signup.passwordHash()));
+						signup.category(), signup.passwordHash()));
 				}
 			}
 

@@ -20,13 +20,13 @@ class OnboardingRepository {
 	}
 
 	long create(String slug, String name, String city, String addressLine, String postalCode,
-		String email, Double longitude, Double latitude) {
+		String email, String defaultCategory, Double longitude, Double latitude) {
 
 		var keys = new GeneratedKeyHolder();
 		jdbc.update("""
 			INSERT INTO provider (slug, name, city, address_line, postal_code, contact_email,
-			                      status, onboarding_state, location)
-			VALUES (:slug, :name, :city, :address, :postal, :email, 'draft', 'started',
+			                      default_category_slug, status, onboarding_state, location)
+			VALUES (:slug, :name, :city, :address, :postal, :email, :category, 'draft', 'started',
 			        -- Cast, because Postgres cannot infer a parameter's type from
 			        -- "IS NULL" alone and refuses the whole statement with "could
 			        -- not determine data type of parameter $7". It only bites when
@@ -43,6 +43,7 @@ class OnboardingRepository {
 				.addValue("address", addressLine)
 				.addValue("postal", postalCode)
 				.addValue("email", email)
+				.addValue("category", defaultCategory)
 				.addValue("lon", longitude)
 				.addValue("lat", latitude),
 			keys, new String[] { "id" });
@@ -165,7 +166,8 @@ class OnboardingRepository {
 		nullableLong(rs, "cal_user_id"),
 		rs.getString("cal_username"),
 		rs.getString("stripe_account_id"),
-		rs.getBoolean("payouts_enabled"));
+		rs.getBoolean("payouts_enabled"),
+		rs.getString("default_category_slug"));
 
 	private static Long nullableLong(ResultSet rs, String column) throws java.sql.SQLException {
 		long value = rs.getLong(column);
@@ -182,7 +184,9 @@ class OnboardingRepository {
 		Long calUserId,
 		String calUsername,
 		String stripeAccountId,
-		boolean payoutsEnabled
+		boolean payoutsEnabled,
+		/** Chosen at signup. Null for providers that predate the question. */
+		String defaultCategory
 	) {}
 
 }

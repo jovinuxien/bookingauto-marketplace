@@ -49,9 +49,9 @@ class SignupRepository {
 		var keys = new GeneratedKeyHolder();
 		jdbc.update("""
 			INSERT INTO provider_signup
-			  (email, salon_name, slug, address_line, postal_code, city,
+			  (email, salon_name, slug, address_line, postal_code, city, category_slug,
 			   password_hash, token_hash, expires_at)
-			VALUES (:email, :name, :slug, :address, :postal, :city, :hash, :token, :expires)
+			VALUES (:email, :name, :slug, :address, :postal, :city, :category, :hash, :token, :expires)
 			""",
 			new MapSqlParameterSource()
 				.addValue("email", signup.email())
@@ -60,6 +60,7 @@ class SignupRepository {
 				.addValue("address", signup.addressLine())
 				.addValue("postal", signup.postalCode())
 				.addValue("city", signup.city())
+				.addValue("category", signup.category())
 				.addValue("hash", signup.passwordHash())
 				.addValue("token", signup.tokenHash())
 				.addValue("expires", java.sql.Timestamp.from(signup.expiresAt())),
@@ -90,7 +91,8 @@ class SignupRepository {
 			 WHERE token_hash = :token
 			   AND state IN ('pending', 'failed')
 			   AND expires_at > now()
-			RETURNING id, email, salon_name, slug, address_line, postal_code, city, password_hash
+			RETURNING id, email, salon_name, slug, address_line, postal_code, city, category_slug,
+			          password_hash
 			""",
 			new MapSqlParameterSource("token", tokenHash),
 			(ResultSet rs, int n) -> new Claimed(
@@ -101,6 +103,7 @@ class SignupRepository {
 				rs.getString("address_line"),
 				rs.getString("postal_code"),
 				rs.getString("city"),
+				rs.getString("category_slug"),
 				rs.getString("password_hash"))).stream().findFirst();
 	}
 
@@ -170,6 +173,7 @@ class SignupRepository {
 		String addressLine,
 		String postalCode,
 		String city,
+		String category,
 		String passwordHash,
 		String tokenHash,
 		Instant expiresAt
@@ -183,6 +187,8 @@ class SignupRepository {
 		String addressLine,
 		String postalCode,
 		String city,
+		/** Null only for rows that predate the field; the import then falls back. */
+		String category,
 		String passwordHash
 	) {}
 

@@ -60,6 +60,7 @@ test.describe('self-serve signup', () => {
     await page.goto('/registrera');
 
     await page.getByLabel('Salongens namn').fill(SALON);
+    await page.getByLabel('Vad erbjuder ni?').selectOption('har');
     await page.getByLabel('Gatuadress').fill('Storgatan 1');
     await page.getByLabel('Postnummer').fill('112 34');
     await page.getByLabel('Ort').fill('Stockholm');

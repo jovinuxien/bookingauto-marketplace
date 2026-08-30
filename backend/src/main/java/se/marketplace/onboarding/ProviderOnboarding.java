@@ -59,10 +59,13 @@ public class ProviderOnboarding {
 	 *
 	 * <p>A real category rather than a null or an "other", because
 	 * {@code category_slug} is what every search filters on and a service in no
-	 * category is a service nobody can find. Correct for a hairdressing
-	 * marketplace today, and quietly wrong the first time a massage-only salon
-	 * onboards — ADR 0013 records that as a watch item rather than pretending
-	 * otherwise.
+	 * category is a service nobody can find.
+	 *
+	 * <p>The fallback behind the fallback. A provider that said what it sells
+	 * at signup has its own default and this is never consulted for it; this
+	 * is for providers created before the question was asked, and for an
+	 * operator who did not answer it. ADR 0013 named the single configured
+	 * default as a watch item; ADR 0015 is where it stopped being tolerable.
 	 */
 	@Value("${marketplace.onboarding.default-category:har}")
 	private String defaultCategory;
@@ -103,7 +106,7 @@ public class ProviderOnboarding {
 			? provider.id()
 			: repository.create(request.slug(), request.name(), request.city(),
 				request.addressLine(), request.postalCode(), request.email(),
-				request.longitude(), request.latitude());
+				request.defaultCategory(), request.longitude(), request.latitude());
 
 		String calUsername = request.slug();
 		boolean calAccountCreated = false;
@@ -210,7 +213,7 @@ public class ProviderOnboarding {
 			// /hudvard/{city} could not exist. See ADR 0013.
 			String category = categories.classify(eventType.title())
 				.map(Category::slug)
-				.orElse(defaultCategory);
+				.orElse(provider.defaultCategory() != null ? provider.defaultCategory() : defaultCategory);
 
 			repository.importService(providerId, eventType.id(), eventType.title(),
 				category, eventType.lengthMinutes(),
@@ -278,6 +281,8 @@ public class ProviderOnboarding {
 		String postalCode,
 		String email,
 		String calPassword,
+		/** Where unmatched services go. Null means the configured default. */
+		String defaultCategory,
 		Double longitude,
 		Double latitude
 	) {}

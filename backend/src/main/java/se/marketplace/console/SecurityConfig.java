@@ -108,6 +108,9 @@ class SecurityConfig {
 				.requestMatchers(HttpMethod.GET, "/api/search/ask").permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/providers/*").permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/services/*/slots").permitAll()
+				// The category list, read by the public signup form. Rows seeded
+				// by migration; there is nothing to protect and nothing to write.
+				.requestMatchers(HttpMethod.GET, "/api/categories").permitAll()
 				.requestMatchers(HttpMethod.POST, "/api/bookings").permitAll()
 
 				// A customer's own booking. Anonymous, because there is no

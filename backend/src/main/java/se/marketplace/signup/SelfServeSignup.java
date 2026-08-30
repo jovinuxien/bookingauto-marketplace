@@ -128,6 +128,10 @@ public class SelfServeSignup {
 			return new Accepted();
 		}
 
+		// Validated above; canonicalised here so what is stored is the slug as
+		// the table spells it rather than as the form sent it.
+		String category = provisioning.knownCategory(trimmed(request.category())).orElseThrow();
+
 		String slug = firstFreeSlug(SignupSlugs.of(request.salonName()));
 
 		if (slug == null) {
@@ -142,7 +146,7 @@ public class SelfServeSignup {
 			long id = repository.create(new SignupRepository.New(
 				email, request.salonName().trim(), slug,
 				trimmed(request.addressLine()), trimmed(request.postalCode()),
-				trimmed(request.city()), provisioning.hashPassword(request.password()),
+				trimmed(request.city()), category, provisioning.hashPassword(request.password()),
 				SignupTokens.hash(token),
 				Instant.now().plus(Duration.ofHours(tokenTtlHours))));
 
@@ -185,7 +189,8 @@ public class SelfServeSignup {
 		try {
 			provisioned = provisioning.provision(new SalonProvisioning.NewSalon(
 				claimed.slug(), claimed.salonName(), claimed.city(),
-				claimed.addressLine(), claimed.postalCode(), claimed.email(), calPassword));
+				claimed.addressLine(), claimed.postalCode(), claimed.email(), calPassword,
+				claimed.category()));
 		}
 		catch (SalonProvisioning.NameTaken e) {
 			repository.markFailed(claimed.id(), e.getMessage());
@@ -292,6 +297,15 @@ public class SelfServeSignup {
 			problems.put("city", "Skriv orten salongen ligger i.");
 		}
 
+		// Required, and checked against the list rather than trusted. This is
+		// what every unmatched service the salon imports will be filed under,
+		// so "none" is not an answer -- it would mean the configured default,
+		// which is hairdressing whatever the salon actually does (ADR 0015).
+		if (blank(request.category())
+			|| provisioning.knownCategory(request.category().trim()).isEmpty()) {
+			problems.put("category", "Välj vad ni erbjuder.");
+		}
+
 		if (blank(request.addressLine())) {
 			problems.put("addressLine", "Skriv gatuadressen.");
 		}
@@ -319,7 +333,9 @@ public class SelfServeSignup {
 		String password,
 		String addressLine,
 		String postalCode,
-		String city
+		String city,
+		/** A category slug, chosen from the list the form fetched. */
+		String category
 	) {}
 
 	public sealed interface Outcome permits Accepted, Rejected, Throttled {}
