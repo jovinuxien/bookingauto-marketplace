@@ -61,6 +61,12 @@ export interface Service {
   currency: string;
   /** Checkout must ask for a registration number. */
   asksVehicle: boolean;
+  /** What everyone pays when no rule matches; equals priceMinor unless a rule did. */
+  listPriceMinor: number;
+  /** The matching rule's label ("Volvo 2015–2019"), or null. */
+  priceLabel: string | null;
+  /** True when priceMinor is for the car in ?regnr=, not the list price. */
+  pricedForVehicle: boolean;
 }
 
 export interface ProviderDetail {

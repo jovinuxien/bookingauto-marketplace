@@ -1,6 +1,6 @@
 # 16. The car is the query, and the price depends on it
 
-**Status:** accepted — phase 1 (the cache and `GET /api/vehicles/{plate}`, `db/017`) and phase 2 (the plate asked first on `/sok`, carried to the salon page and checkout) built; phase 3 (price rules) pending
+**Status:** accepted and built — phase 1 (`db/017`, `GET /api/vehicles/{plate}`), phase 2 (the plate asked first and carried), phase 3 (`db/018`, `service_price_rule`, the matcher on the page and in the funnel, the console pricing page)
 
 **Builds on** ADR 0015, which put the registration number on the booking and
 a registry behind a port, and on ADR 0003, which says money is written only

@@ -12,5 +12,5 @@
 	// list before because it needed nothing; an empty list and an unstated one
 	// look identical from here, and this endpoint is one whose exposure should
 	// be written down rather than inferred.
-	allowedDependencies = { "ratelimit", "categories" })
+	allowedDependencies = { "ratelimit", "categories", "vehicles", "pricing" })
 package se.marketplace.search;

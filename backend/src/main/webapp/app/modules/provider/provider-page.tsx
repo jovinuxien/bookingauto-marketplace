@@ -95,7 +95,12 @@ const ProviderPage = () => {
             <span>
               {candidate.name} · {candidate.durationMinutes} min
             </span>
-            <span>{formatPrice(candidate.priceMinor, candidate.currency)}</span>
+            <span>
+              {formatPrice(candidate.priceMinor, candidate.currency)}
+              {candidate.pricedForVehicle && (
+                <small className="d-block text-end opacity-75">för din bil{candidate.priceLabel ? ` · ${candidate.priceLabel}` : ''}</small>
+              )}
+            </span>
           </button>
         ))}
       </div>
@@ -132,7 +137,7 @@ const ProviderPage = () => {
               key={start}
               className="btn btn-outline-primary"
               onClick={() =>
-                navigate(`/boka/${service.id}?start=${encodeURIComponent(start)}&slug=${provider.slug}${service.asksVehicle ? '&fordon=1' : ''}${regnr ? `&regnr=${encodeURIComponent(regnr)}` : ''}`)
+                navigate(`/boka/${service.id}?start=${encodeURIComponent(start)}&slug=${provider.slug}${service.asksVehicle ? '&fordon=1' : ''}${regnr ? `&regnr=${encodeURIComponent(regnr)}` : ''}&pris=${service.priceMinor}`)
               }
             >
               {formatTime(start)}

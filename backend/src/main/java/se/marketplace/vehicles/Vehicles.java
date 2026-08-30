@@ -79,6 +79,16 @@ public class Vehicles {
 		return answer;
 	}
 
+	/**
+	 * What the cache holds, however old, and never the registry. For the
+	 * booking saga (ADR 0016): a customer who came through the page has
+	 * already caused the lookup, and one who did not gets the list price
+	 * rather than a third party on the path.
+	 */
+	public Optional<Vehicle> cached(RegistrationNumber plate) {
+		return cache.find(plate).map(Cached::vehicle);
+	}
+
 	private boolean fresh(Cached cached) {
 		Duration ttl = Duration.ofDays(cached.known() ? knownDays : unknownDays);
 		return cached.lookedUpAt().plus(ttl).isAfter(Instant.now());

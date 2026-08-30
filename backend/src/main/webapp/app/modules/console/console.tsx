@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import Pricing from 'app/modules/console/pricing';
 
 import { useAppDispatch, useAppSelector } from 'app/config/store';
 import { loadConsole } from 'app/shared/reducers/console.reducer';
@@ -90,6 +91,8 @@ const Console = () => {
           </table>
         </div>
       )}
+
+      <Pricing />
     </>
   );
 };

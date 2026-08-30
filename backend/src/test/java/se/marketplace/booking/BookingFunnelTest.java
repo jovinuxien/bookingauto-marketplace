@@ -1,6 +1,11 @@
 package se.marketplace.booking;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
@@ -18,6 +23,11 @@ import se.marketplace.booking.BookingRepository.Attempt;
 import se.marketplace.booking.BookingRepository.NewAttempt;
 import se.marketplace.booking.BookingRepository.ServiceForSale;
 import se.marketplace.notifications.Notifier;
+import se.marketplace.pricing.PriceRules;
+import se.marketplace.pricing.Quote;
+import se.marketplace.vehicles.RegistrationNumber;
+import se.marketplace.vehicles.Vehicle;
+import se.marketplace.vehicles.Vehicles;
 import se.marketplace.payments.PaymentPort;
 import se.marketplace.sync.CalBookingPort;
 
@@ -42,6 +52,8 @@ class BookingFunnelTest {
 	private RecordingRepository repository;
 	private List<Long> refreshed;
 	private RecordingNotifier notifier;
+	private PriceRules priceRules;
+	private Vehicles vehicles;
 	private BookingFunnel funnel;
 
 	@BeforeEach
@@ -56,8 +68,13 @@ class BookingFunnelTest {
 		ReflectionTestUtils.setField(links, "configuredSecret", "test-secret");
 		ReflectionTestUtils.setField(links, "publicUrl", "https://boka.example.se");
 
+		priceRules = mock(PriceRules.class);
+		vehicles = mock(Vehicles.class);
+		// List price unless a test says otherwise: the matcher has its own tests.
+		when(priceRules.quote(anyLong(), anyInt(), any())).thenAnswer(call -> Quote.list(call.getArgument(1)));
+
 		funnel = new BookingFunnel(repository, cal, payments,
-			serviceId -> refreshed.add(serviceId), notifier, links);
+			serviceId -> refreshed.add(serviceId), notifier, links, priceRules, vehicles);
 		ReflectionTestUtils.setField(funnel, "commissionBps", 1500);
 		ReflectionTestUtils.setField(funnel, "timeZone", "Europe/Stockholm");
 		ReflectionTestUtils.setField(funnel, "cancellationCutoffHours", 24);
@@ -65,12 +82,12 @@ class BookingFunnelTest {
 
 	private BookingFunnel.Outcome book() {
 		return funnel.book(new BookingFunnel.BookingRequest(
-			"key-1", 1L, SLOT, "Testkund", "test@example.se", null));
+			"key-1", 1L, SLOT, "Testkund", "test@example.se", null, null));
 	}
 
 	private BookingFunnel.Outcome bookWithPlate(String plate) {
 		return funnel.book(new BookingFunnel.BookingRequest(
-			"key-1", 1L, SLOT, "Testkund", "test@example.se", plate));
+			"key-1", 1L, SLOT, "Testkund", "test@example.se", plate, null));
 	}
 
 	// ------------------------------------------------------------ happy path --
@@ -114,6 +131,48 @@ class BookingFunnelTest {
 
 		assertThat(outcome.sold()).isTrue();
 		assertThat(repository.started.registrationNumber()).isEqualTo("ABC123");
+	}
+
+	@Test
+	@DisplayName("the price is the rule's price for the cached car, and it is what gets frozen")
+	void ruleIsApplied() {
+		repository.asksVehicle = true;
+		Vehicle v70 = new Vehicle("VOLVO", "V70", 2016, "215/55R16", "215/55R16");
+		when(vehicles.cached(new RegistrationNumber("ABC123"))).thenReturn(Optional.of(v70));
+		when(priceRules.quote(1L, 60000, Optional.of(v70))).thenReturn(new Quote(24900, "Volvo 2015–2019", true));
+
+		BookingFunnel.Outcome outcome = bookWithPlate("ABC123");
+
+		assertThat(outcome.sold()).isTrue();
+		assertThat(repository.started.priceMinor()).isEqualTo(24900);
+		// Commission follows the price actually charged, 15% of 24 900.
+		assertThat(repository.started.commissionMinor()).isEqualTo(3735);
+	}
+
+	@Test
+	@DisplayName("a price the page did not show is refused before anything is reserved")
+	void changedPriceIsRefused() {
+		repository.asksVehicle = true;
+		when(vehicles.cached(any())).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> funnel.book(new BookingFunnel.BookingRequest(
+				"key-1", 1L, SLOT, "Testkund", "test@example.se", "ABC123", 49900)))
+			.isInstanceOf(BookingFunnel.PriceChanged.class)
+			.satisfies(e -> assertThat(((BookingFunnel.PriceChanged) e).priceMinor()).isEqualTo(60000));
+		assertThat(repository.started).isNull();
+		assertThat(cal.reserved).isZero();
+	}
+
+	@Test
+	@DisplayName("the shown price, when it still holds, is accepted")
+	void unchangedPriceIsAccepted() {
+		repository.asksVehicle = true;
+		when(vehicles.cached(any())).thenReturn(Optional.empty());
+
+		var outcome = funnel.book(new BookingFunnel.BookingRequest(
+			"key-1", 1L, SLOT, "Testkund", "test@example.se", "ABC123", 60000));
+
+		assertThat(outcome.sold()).isTrue();
 	}
 
 	@Test

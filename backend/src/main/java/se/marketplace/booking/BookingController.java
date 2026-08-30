@@ -38,7 +38,14 @@ class BookingController {
 			Instant.parse(request.slotStart()),
 			request.customerName(),
 			request.customerEmail(),
-			request.registrationNumber()));
+			request.registrationNumber(),
+			request.quotedPriceMinor()));
+		}
+		catch (BookingFunnel.PriceChanged e) {
+			// 409: nothing was reserved; the body carries the price as it is
+			// now so the page can show it and ask again.
+			return ResponseEntity.status(HttpStatus.CONFLICT)
+				.body(new PriceNow(e.priceMinor(), e.currency()));
 		}
 		catch (IllegalArgumentException e) {
 			// The request itself was wrong -- no such service, or a workshop's
@@ -70,7 +77,11 @@ class BookingController {
 		String customerName,
 		String customerEmail,
 		/** Only for services whose category asks; ignored otherwise. */
-		String registrationNumber
+		String registrationNumber,
+		/** The price the page showed. Optional; when sent, a changed price is a 409. */
+		Integer quotedPriceMinor
 	) {}
+
+	record PriceNow(int priceMinor, String currency) {}
 
 }

@@ -19,5 +19,5 @@
  */
 @org.springframework.modulith.ApplicationModule(
 	displayName = "Booking",
-	allowedDependencies = { "sync", "payments", "notifications", "ratelimit", "vehicles" })
+	allowedDependencies = { "sync", "payments", "notifications", "ratelimit", "vehicles", "pricing" })
 package se.marketplace.booking;

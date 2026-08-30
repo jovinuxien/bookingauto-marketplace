@@ -16,7 +16,10 @@ import se.marketplace.notifications.Notifier;
 import se.marketplace.payments.PaymentPort;
 import se.marketplace.sync.AvailabilityRefreshPort;
 import se.marketplace.sync.CalBookingPort;
+import se.marketplace.pricing.PriceRules;
+import se.marketplace.pricing.Quote;
 import se.marketplace.vehicles.RegistrationNumber;
+import se.marketplace.vehicles.Vehicles;
 
 /**
  * The funnel.
@@ -52,6 +55,8 @@ public class BookingFunnel {
 	private static final Logger log = LoggerFactory.getLogger(BookingFunnel.class);
 
 	private final BookingRepository repository;
+	private final PriceRules priceRules;
+	private final Vehicles vehicles;
 	private final CalBookingPort cal;
 	private final PaymentPort payments;
 	private final AvailabilityRefreshPort availability;
@@ -74,13 +79,16 @@ public class BookingFunnel {
 
 	BookingFunnel(BookingRepository repository, CalBookingPort cal,
 		PaymentPort payments, AvailabilityRefreshPort availability, Notifier notifier,
-		BookingLinks links) {
+		BookingLinks links,
+		PriceRules priceRules, Vehicles vehicles) {
 		this.repository = repository;
 		this.cal = cal;
 		this.payments = payments;
 		this.availability = availability;
 		this.notifier = notifier;
 		this.links = links;
+		this.priceRules = priceRules;
+		this.vehicles = vehicles;
 	}
 
 	/**
@@ -122,15 +130,33 @@ public class BookingFunnel {
 					"service " + service.serviceId() + " needs a registration number"));
 		}
 
+		// The price for this car, from the same rules the page used (ADR 0016).
+		// The cache only, never the registry: a customer who came through the
+		// page has already caused the lookup, and one who did not gets the list
+		// price rather than a third party on the path.
+		int price = service.priceMinor();
+		if (plate != null) {
+			Quote quote = priceRules.quote(service.serviceId(), service.priceMinor(),
+				vehicles.cached(new RegistrationNumber(plate)));
+			price = quote.priceMinor();
+		}
+
+		// The page showed a number and the customer clicked on it. If a rule
+		// changed in between, refuse with the new number rather than charging
+		// either silently.
+		if (request.quotedPriceMinor() != null && request.quotedPriceMinor() != price) {
+			throw new PriceChanged(price, service.currency());
+		}
+
 		// Stage 5: freeze the quote. Copied onto the attempt, never re-read.
-		int commission = Math.round(service.priceMinor() * commissionBps / 10_000f);
+		int commission = Math.round(price * commissionBps / 10_000f);
 
 		Attempt attempt = repository.start(new NewAttempt(
 			request.idempotencyKey(),
 			service.providerId(),
 			service.serviceId(),
 			request.slotStart(),
-			service.priceMinor(),
+			price,
 			commission,
 			service.currency(),
 			request.customerEmail(),
@@ -512,8 +538,25 @@ public class BookingFunnel {
 		String customerName,
 		String customerEmail,
 		/** As typed. Null or blank unless the service's category asks. */
-		String registrationNumber
+		String registrationNumber,
+		/** What the page showed, so a rule edited since is refused rather than charged. Null = no check. */
+		Integer quotedPriceMinor
 	) {}
+
+	/** The price is not what the page said. Carries what it is now. */
+	public static class PriceChanged extends RuntimeException {
+		private final int priceMinor;
+		private final String currency;
+
+		PriceChanged(int priceMinor, String currency) {
+			super("price is now " + priceMinor);
+			this.priceMinor = priceMinor;
+			this.currency = currency;
+		}
+
+		public int priceMinor() { return priceMinor; }
+		public String currency() { return currency; }
+	}
 
 	/**
 	 * @param clientSecret present only while the customer still has to approve

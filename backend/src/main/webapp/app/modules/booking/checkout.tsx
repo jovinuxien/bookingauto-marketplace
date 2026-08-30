@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 
 import { useAppDispatch, useAppSelector } from 'app/config/store';
 import { book, checkoutReset } from 'app/shared/reducers/booking.reducer';
-import { formatDay, formatTime } from 'app/shared/util/format';
+import { formatDay, formatPrice, formatTime } from 'app/shared/util/format';
 
 /**
  * Checkout.
@@ -29,8 +29,11 @@ const Checkout = () => {
   // and the server checks again regardless -- a workshop is never sent a
   // booking with no car on it whatever the URL said.
   const asksVehicle = params.get('fordon') === '1';
+  // The price the salon page showed. Sent back so a rule changed since is a
+  // 409 with the new number rather than a silent charge (ADR 0016).
+  const shownPrice = params.get('pris') ? Number(params.get('pris')) : undefined;
 
-  const { outcome, submitting, error } = useAppSelector(state => state.booking);
+  const { outcome, submitting, error, priceNow } = useAppSelector(state => state.booking);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   // Pre-filled from the search or the salon page; still editable, because the
@@ -51,6 +54,7 @@ const Checkout = () => {
       customerName: name,
       customerEmail: email,
       ...(asksVehicle ? { registrationNumber: plate } : {}),
+      ...(shownPrice !== undefined ? { quotedPriceMinor: shownPrice } : {}),
     }));
   };
 
@@ -122,7 +126,16 @@ const Checkout = () => {
           {formatDay(start)} kl {formatTime(start)}
         </p>
 
-        {error && <div className="alert alert-warning">{error}</div>}
+        {error && priceNow === null && <div className="alert alert-warning">{error}</div>}
+        {priceNow !== null && (
+          <div className="alert alert-warning">
+            Priset har ändrats sedan du valde tiden: nu {formatPrice(priceNow, 'SEK')}.
+            {slug && <> <Link to={`/salong/${slug}`}>Tillbaka till salongen</Link> för att boka till det nya priset.</>}
+          </div>
+        )}
+        {shownPrice !== undefined && priceNow === null && (
+          <p className="fw-semibold">{formatPrice(shownPrice, 'SEK')}</p>
+        )}
 
         <form onSubmit={submit}>
           <div className="mb-3">

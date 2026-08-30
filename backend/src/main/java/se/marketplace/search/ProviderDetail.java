@@ -27,7 +27,13 @@ public record ProviderDetail(
 		int priceMinor,
 		String currency,
 		/** Checkout asks for a registration number. */
-		boolean asksVehicle
+		boolean asksVehicle,
+		/** What everyone pays when no rule matches; equals priceMinor unless a rule did. */
+		int listPriceMinor,
+		/** The matching rule's label ("Volvo 2015–2019"), or null. */
+		String priceLabel,
+		/** True when priceMinor is for the car in ?regnr=, not the list price. */
+		boolean pricedForVehicle
 	) {}
 
 }

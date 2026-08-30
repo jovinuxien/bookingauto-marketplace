@@ -36,6 +36,45 @@ export interface ConsoleBooking {
   vehicle: string | null;
 }
 
+/** One service on the pricing page, with its rules (ADR 0016). */
+export interface ServicePricing {
+  service: { id: number; name: string; priceMinor: number; currency: string; active: boolean; asksVehicle: boolean };
+  rules: PriceRule[];
+}
+
+export interface PriceRule {
+  id: number;
+  serviceId: number;
+  make: string | null;
+  modelPrefix: string | null;
+  yearFrom: number | null;
+  yearTo: number | null;
+  rimFrom: number | null;
+  rimTo: number | null;
+  priceMinor: number;
+  label: string;
+}
+
+export interface NewPriceRule {
+  make?: string;
+  modelPrefix?: string;
+  yearFrom?: number;
+  yearTo?: number;
+  rimFrom?: number;
+  rimTo?: number;
+  priceMinor: number;
+  label?: string;
+}
+
+/** "Vad kostar det för ABC 123?" */
+export interface ConsoleQuote {
+  plate: string;
+  vehicle: string | null;
+  tyres: string | null;
+  registryUnavailable: boolean;
+  quote: { priceMinor: number; label: string | null; forVehicle: boolean };
+}
+
 /** An attempt no machine could finish. */
 export interface AttentionItem {
   id: number;

@@ -3,6 +3,7 @@ package se.marketplace.search;
 import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -10,7 +11,15 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import se.marketplace.pricing.PriceRules;
+import se.marketplace.pricing.Quote;
+import se.marketplace.vehicles.RegistrationNumber;
+import se.marketplace.vehicles.Vehicle;
+import se.marketplace.vehicles.VehicleRegistryPort.RegistryUnavailable;
+import se.marketplace.vehicles.Vehicles;
 
 /**
  * Provider pages.
@@ -25,13 +34,18 @@ import org.springframework.web.bind.annotation.RestController;
 class CatalogueController {
 
 	private final NamedParameterJdbcTemplate jdbc;
+	private final PriceRules priceRules;
+	private final Vehicles vehicles;
 
-	CatalogueController(NamedParameterJdbcTemplate jdbc) {
+	CatalogueController(NamedParameterJdbcTemplate jdbc, PriceRules priceRules, Vehicles vehicles) {
 		this.jdbc = jdbc;
+		this.priceRules = priceRules;
+		this.vehicles = vehicles;
 	}
 
 	@GetMapping("/{slug}")
-	ResponseEntity<ProviderDetail> bySlug(@PathVariable String slug) {
+	ResponseEntity<ProviderDetail> bySlug(@PathVariable String slug,
+		@RequestParam(required = false) String regnr) {
 		List<ProviderDetail> found = jdbc.query("""
 			SELECT id, slug, name, city, address_line, description
 			  FROM provider
@@ -49,6 +63,20 @@ class CatalogueController {
 
 		ProviderDetail provider = found.get(0);
 
+		// The car, when the page carries a plate (ADR 0016). Through the cache;
+		// a registry that cannot be asked means list prices, not an error.
+		Optional<Vehicle> vehicle = Optional.empty();
+		Optional<RegistrationNumber> plate = RegistrationNumber.parse(regnr);
+		if (plate.isPresent()) {
+			try {
+				vehicle = vehicles.lookup(plate.get());
+			}
+			catch (RegistryUnavailable e) {
+				vehicle = Optional.empty();
+			}
+		}
+		final Optional<Vehicle> car = vehicle;
+
 		List<ProviderDetail.Service> services = jdbc.query("""
 			SELECT s.id, s.name, s.category_slug, s.duration_minutes, s.price_minor, s.currency,
 			       COALESCE(c.asks_vehicle, false) AS asks_vehicle
@@ -58,10 +86,17 @@ class CatalogueController {
 			 ORDER BY s.name
 			""",
 			new MapSqlParameterSource("id", provider.id()),
-			(ResultSet rs, int n) -> new ProviderDetail.Service(
-				rs.getLong("id"), rs.getString("name"), rs.getString("category_slug"),
-				rs.getInt("duration_minutes"), rs.getInt("price_minor"), rs.getString("currency"),
-				rs.getBoolean("asks_vehicle")));
+			(ResultSet rs, int n) -> {
+				int listPrice = rs.getInt("price_minor");
+				boolean asks = rs.getBoolean("asks_vehicle");
+				Quote quote = asks
+					? priceRules.quote(rs.getLong("id"), listPrice, car)
+					: new Quote(listPrice, null, false);
+				return new ProviderDetail.Service(
+					rs.getLong("id"), rs.getString("name"), rs.getString("category_slug"),
+					rs.getInt("duration_minutes"), quote.priceMinor(), rs.getString("currency"),
+					asks, listPrice, quote.label(), quote.forVehicle());
+			});
 
 		return ResponseEntity.ok(new ProviderDetail(
 			provider.id(), provider.slug(), provider.name(), provider.city(),

@@ -11,12 +11,16 @@ export interface CheckoutRequest {
   customerEmail: string;
   /** Sent only when the service asks; the server ignores it otherwise. */
   registrationNumber?: string;
+  /** The price the page showed. A changed price is answered 409 with the new one. */
+  quotedPriceMinor?: number;
 }
 
 interface BookingState {
   outcome: BookingOutcome | null;
   submitting: boolean;
   error: string | null;
+  /** Set when the server answered 409: the price is not what the page showed. */
+  priceNow: number | null;
   /**
    * Generated once per checkout and reused on every retry.
    *
@@ -37,6 +41,7 @@ const initialState: BookingState = {
   outcome: null,
   submitting: false,
   error: null,
+  priceNow: null,
   idempotencyKey: newKey(),
 };
 
@@ -64,6 +69,7 @@ const bookingSlice = createSlice({
     checkoutReset(state) {
       state.outcome = null;
       state.error = null;
+      state.priceNow = null;
       state.submitting = false;
       state.idempotencyKey = newKey();
     },
@@ -80,6 +86,12 @@ const bookingSlice = createSlice({
       })
       .addCase(book.rejected, (state, action) => {
         state.submitting = false;
+        const body = action.payload?.data as { priceMinor?: number } | undefined;
+        if (action.payload?.status === 409 && body && typeof body.priceMinor === 'number') {
+          state.priceNow = body.priceMinor;
+          state.error = null;
+          return;
+        }
         state.error = action.payload?.message ?? 'Bokningen misslyckades.';
       });
   },

@@ -142,6 +142,24 @@ class ConsoleRepository {
 		int upcomingCount
 	) {}
 
+	/** The provider's services, for the pricing page. */
+	List<ServiceRow> services(long providerId) {
+		return jdbc.query("""
+			SELECT s.id, s.name, s.price_minor, s.currency, s.active,
+			       COALESCE(c.asks_vehicle, false) AS asks_vehicle
+			  FROM service s
+			  LEFT JOIN service_category c ON c.slug = s.category_slug
+			 WHERE s.provider_id = :id
+			 ORDER BY s.name
+			""",
+			new MapSqlParameterSource("id", providerId),
+			(ResultSet rs, int n) -> new ServiceRow(rs.getLong("id"), rs.getString("name"),
+				rs.getInt("price_minor"), rs.getString("currency"), rs.getBoolean("active"),
+				rs.getBoolean("asks_vehicle")));
+	}
+
+	record ServiceRow(long id, String name, int priceMinor, String currency, boolean active, boolean asksVehicle) {}
+
 	record BookingRow(
 		long id,
 		Instant startsAt,
