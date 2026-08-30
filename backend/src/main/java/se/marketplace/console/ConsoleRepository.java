@@ -73,7 +73,8 @@ class ConsoleRepository {
 			       b.price_minor, b.commission_minor, b.currency, b.status,
 			       b.cal_booking_uid, s.name AS service_name,
 			       b.registration_number, b.vehicle_make, b.vehicle_model, b.vehicle_model_year,
-			       b.vehicle_tyre_front, b.vehicle_tyre_rear
+			       b.vehicle_tyre_front, b.vehicle_tyre_rear,
+			       (SELECT string_agg(x.name, ', ' ORDER BY x.name) FROM booking_addon x WHERE x.booking_id = b.id) AS addons
 			  FROM booking b
 			  JOIN service s ON s.id = b.service_id
 			 WHERE b.provider_id = :id
@@ -95,7 +96,8 @@ class ConsoleRepository {
 				rs.getString("service_name"),
 				rs.getString("cal_booking_uid"),
 				rs.getString("registration_number"),
-				vehicle(rs)));
+				vehicle(rs),
+				rs.getString("addons")));
 	}
 
 	/**
@@ -175,7 +177,9 @@ class ConsoleRepository {
 		/** As the customer typed it, normalised. Null for a salon's booking. */
 		String registrationNumber,
 		/** "Volvo V70 (2016)" once the registry has answered; null until then. */
-		String vehicle
+		String vehicle,
+		/** "Spolarvätska, Däckhotell" — what to fetch from the shelf; null for none. */
+		String addons
 	) {}
 
 	/** One line or nothing. The columns are filled in together, so make decides. */

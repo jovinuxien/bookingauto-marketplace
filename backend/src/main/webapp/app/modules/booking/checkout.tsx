@@ -4,6 +4,8 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from 'app/config/store';
 import { book, checkoutReset } from 'app/shared/reducers/booking.reducer';
 import { formatDay, formatPrice, formatTime } from 'app/shared/util/format';
+import axios from 'app/config/axiosinstance';
+import type { Addon, ProviderDetail } from 'app/shared/model/marketplace.model';
 
 /**
  * Checkout.
@@ -39,6 +41,19 @@ const Checkout = () => {
   // Pre-filled from the search or the salon page; still editable, because the
   // car someone looked up is not always the car they are bringing.
   const [plate, setPlate] = useState(params.get('regnr') ?? '');
+  // The extras on offer for this service, fetched with the salon so the
+  // names and prices shown are the server's; only ids go back (ADR 0017).
+  const [addons, setAddons] = useState<Addon[]>([]);
+  const [chosen, setChosen] = useState<number[]>([]);
+  useEffect(() => {
+    if (!slug) return;
+    axios.get<ProviderDetail>(`/providers/${slug}`).then(
+      response => setAddons(response.data.services.find(s => s.id === Number(serviceId))?.addons ?? []),
+      () => setAddons([]),
+    );
+  }, [slug, serviceId]);
+  const extrasTotal = addons.filter(a => chosen.includes(a.id)).reduce((sum, a) => sum + a.priceMinor, 0);
+  const total = shownPrice !== undefined ? shownPrice + extrasTotal : undefined;
 
   // A fresh key per visit, so a customer who comes back to book a different
   // time is not silently replaying the previous attempt.
@@ -54,7 +69,8 @@ const Checkout = () => {
       customerName: name,
       customerEmail: email,
       ...(asksVehicle ? { registrationNumber: plate } : {}),
-      ...(shownPrice !== undefined ? { quotedPriceMinor: shownPrice } : {}),
+      ...(total !== undefined ? { quotedPriceMinor: total } : {}),
+      ...(chosen.length > 0 ? { addonIds: chosen } : {}),
     }));
   };
 
@@ -133,8 +149,24 @@ const Checkout = () => {
             {slug && <> <Link to={`/salong/${slug}`}>Tillbaka till salongen</Link> för att boka till det nya priset.</>}
           </div>
         )}
-        {shownPrice !== undefined && priceNow === null && (
-          <p className="fw-semibold">{formatPrice(shownPrice, 'SEK')}</p>
+        {addons.length > 0 && (
+          <fieldset className="mb-3">
+            <legend className="h6">Tillval</legend>
+            {addons.map(addon => (
+              <div className="form-check" key={addon.id}>
+                <input className="form-check-input" type="checkbox" id={`addon-${addon.id}`}
+                  checked={chosen.includes(addon.id)}
+                  onChange={event => setChosen(event.target.checked
+                    ? [...chosen, addon.id] : chosen.filter(id => id !== addon.id))} />
+                <label className="form-check-label" htmlFor={`addon-${addon.id}`}>
+                  {addon.name} <span className="text-muted">+ {formatPrice(addon.priceMinor, 'SEK')}</span>
+                </label>
+              </div>
+            ))}
+          </fieldset>
+        )}
+        {total !== undefined && priceNow === null && (
+          <p className="fw-semibold">Att betala: {formatPrice(total, 'SEK')}</p>
         )}
 
         <form onSubmit={submit}>

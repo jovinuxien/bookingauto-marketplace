@@ -3,6 +3,7 @@ package se.marketplace.booking;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -242,7 +243,8 @@ public class BookingCancellation {
 			booking.id(),
 			booking.providerId(),
 			links.urlFor(booking.id(), booking.customerEmail()),
-			booking.registrationNumber());
+			booking.registrationNumber(),
+			null);
 
 		notifier.bookingCancelled(notice, refunded, booking.cancellationCutoffHours());
 
@@ -277,7 +279,8 @@ public class BookingCancellation {
 			booking.registrationNumber(),
 			confirmed && !now.isBefore(booking.endsAt()),
 			review.map(Review::rating).orElse(null),
-			review.map(Review::comment).orElse(null));
+			review.map(Review::comment).orElse(null),
+			repository.addonsOf(booking.id()));
 	}
 
 	/** The row as it now reads, without going back to the database to find out. */
@@ -323,8 +326,12 @@ public class BookingCancellation {
 		boolean reviewable,
 		/** What this customer already said, or null. */
 		Integer reviewRating,
-		String reviewComment
+		String reviewComment,
+		/** Add-ons chosen at checkout, as sold. */
+		List<Extra> extras
 	) {}
+
+	public record Extra(String name, int priceMinor) {}
 
 	public sealed interface Result {}
 

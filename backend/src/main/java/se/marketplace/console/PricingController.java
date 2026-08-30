@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import se.marketplace.pricing.Addon;
+import se.marketplace.pricing.Addons;
 import se.marketplace.pricing.PriceRule;
 import se.marketplace.pricing.PriceRules;
 import se.marketplace.pricing.Quote;
@@ -39,18 +41,21 @@ class PricingController {
 	private final ConsoleRepository repository;
 	private final PriceRules rules;
 	private final Vehicles vehicles;
+	private final Addons addons;
 
-	PricingController(ConsoleRepository repository, PriceRules rules, Vehicles vehicles) {
+	PricingController(ConsoleRepository repository, PriceRules rules, Vehicles vehicles, Addons addons) {
 		this.repository = repository;
 		this.rules = rules;
 		this.vehicles = vehicles;
+		this.addons = addons;
 	}
 
 	@GetMapping
 	List<ServicePricing> all(@AuthenticationPrincipal ConsolePrincipal principal) {
 		return repository.services(principal.providerId()).stream()
 			.map(service -> new ServicePricing(service,
-				rules.rulesFor(principal.providerId(), service.id()).orElse(List.of())))
+				rules.rulesFor(principal.providerId(), service.id()).orElse(List.of()),
+				addons.forService(service.id())))
 			.toList();
 	}
 
@@ -65,6 +70,27 @@ class PricingController {
 		catch (IllegalArgumentException e) {
 			return ResponseEntity.badRequest().body(e.getMessage());
 		}
+	}
+
+	@PostMapping("/{serviceId}/addons")
+	ResponseEntity<?> addAddon(@AuthenticationPrincipal ConsolePrincipal principal,
+		@PathVariable long serviceId, @RequestBody NewAddon addon) {
+		try {
+			return addons.add(principal.providerId(), serviceId, addon.name(), addon.priceMinor())
+				.<ResponseEntity<?>>map(created -> ResponseEntity.status(HttpStatus.CREATED).body(created))
+				.orElseGet(() -> ResponseEntity.notFound().build());
+		}
+		catch (IllegalArgumentException e) {
+			return ResponseEntity.badRequest().body(e.getMessage());
+		}
+	}
+
+	@DeleteMapping("/addons/{addonId}")
+	ResponseEntity<Void> retireAddon(@AuthenticationPrincipal ConsolePrincipal principal,
+		@PathVariable long addonId) {
+		return addons.retire(principal.providerId(), addonId)
+			? ResponseEntity.noContent().build()
+			: ResponseEntity.notFound().build();
 	}
 
 	@DeleteMapping("/rules/{ruleId}")
@@ -108,7 +134,9 @@ class PricingController {
 			registryDown, quote));
 	}
 
-	record ServicePricing(ConsoleRepository.ServiceRow service, List<PriceRule> rules) {}
+	record ServicePricing(ConsoleRepository.ServiceRow service, List<PriceRule> rules, List<Addon> addons) {}
+
+	record NewAddon(String name, int priceMinor) {}
 
 	record QuoteView(String plate, String vehicle, String tyres, boolean registryUnavailable, Quote quote) {}
 

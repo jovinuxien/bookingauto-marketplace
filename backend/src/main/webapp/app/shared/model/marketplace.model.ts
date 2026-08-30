@@ -70,6 +70,15 @@ export interface Service {
   priceLabel: string | null;
   /** True when priceMinor is for the car in ?regnr=, not the list price. */
   pricedForVehicle: boolean;
+  /** Extras the customer can tick at checkout (ADR 0017). */
+  addons: Addon[];
+}
+
+export interface Addon {
+  id: number;
+  serviceId: number;
+  name: string;
+  priceMinor: number;
 }
 
 export interface ProviderDetail {

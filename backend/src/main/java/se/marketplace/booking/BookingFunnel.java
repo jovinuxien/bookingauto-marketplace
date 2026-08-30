@@ -2,6 +2,7 @@ package se.marketplace.booking;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -16,6 +17,8 @@ import se.marketplace.notifications.Notifier;
 import se.marketplace.payments.PaymentPort;
 import se.marketplace.sync.AvailabilityRefreshPort;
 import se.marketplace.sync.CalBookingPort;
+import se.marketplace.pricing.Addon;
+import se.marketplace.pricing.Addons;
 import se.marketplace.pricing.PriceRules;
 import se.marketplace.pricing.Quote;
 import se.marketplace.vehicles.RegistrationNumber;
@@ -57,6 +60,7 @@ public class BookingFunnel {
 	private final BookingRepository repository;
 	private final PriceRules priceRules;
 	private final Vehicles vehicles;
+	private final Addons addons;
 	private final CalBookingPort cal;
 	private final PaymentPort payments;
 	private final AvailabilityRefreshPort availability;
@@ -80,7 +84,7 @@ public class BookingFunnel {
 	BookingFunnel(BookingRepository repository, CalBookingPort cal,
 		PaymentPort payments, AvailabilityRefreshPort availability, Notifier notifier,
 		BookingLinks links,
-		PriceRules priceRules, Vehicles vehicles) {
+		PriceRules priceRules, Vehicles vehicles, Addons addons) {
 		this.repository = repository;
 		this.cal = cal;
 		this.payments = payments;
@@ -89,6 +93,7 @@ public class BookingFunnel {
 		this.links = links;
 		this.priceRules = priceRules;
 		this.vehicles = vehicles;
+		this.addons = addons;
 	}
 
 	/**
@@ -141,6 +146,11 @@ public class BookingFunnel {
 			price = quote.priceMinor();
 		}
 
+		// The extras (ADR 0017): ids from the client, names and prices from
+		// us. Anything that is not this service's, or is retired, is refused.
+		List<Addon> chosen = addons.priced(service.serviceId(), request.addonIds());
+		price += Addons.total(chosen);
+
 		// The page showed a number and the customer clicked on it. If a rule
 		// changed in between, refuse with the new number rather than charging
 		// either silently.
@@ -161,7 +171,8 @@ public class BookingFunnel {
 			service.currency(),
 			request.customerEmail(),
 			request.customerName(),
-			plate));
+			plate,
+			chosen));
 
 		return runSaga(attempt, service, request);
 	}
@@ -524,7 +535,8 @@ public class BookingFunnel {
 			// written is a 404 sent to someone already having a bad time.
 			bookingId == null
 				? null : links.urlFor(bookingId, attempt.customerEmail()),
-			attempt.registrationNumber());
+			attempt.registrationNumber(),
+			repository.attemptExtras(attempt.id()));
 	}
 
 	private Outcome outcomeOf(Attempt attempt) {
@@ -540,7 +552,9 @@ public class BookingFunnel {
 		/** As typed. Null or blank unless the service's category asks. */
 		String registrationNumber,
 		/** What the page showed, so a rule edited since is refused rather than charged. Null = no check. */
-		Integer quotedPriceMinor
+		Integer quotedPriceMinor,
+		/** Add-ons ticked at checkout, by id. Null or empty for none. */
+		List<Long> addonIds
 	) {}
 
 	/** The price is not what the page said. Carries what it is now. */

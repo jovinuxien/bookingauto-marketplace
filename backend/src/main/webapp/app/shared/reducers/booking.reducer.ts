@@ -13,6 +13,8 @@ export interface CheckoutRequest {
   registrationNumber?: string;
   /** The price the page showed. A changed price is answered 409 with the new one. */
   quotedPriceMinor?: number;
+  /** Add-ons ticked at checkout. */
+  addonIds?: number[];
 }
 
 interface BookingState {

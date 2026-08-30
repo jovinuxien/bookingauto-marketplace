@@ -54,14 +54,14 @@ class OutboxNotifier implements Notifier {
 			  %s
 			  %s
 			  %s
-
+			%s
 			Behöver du avboka gör du det själv här:
 			%s
 
 			%s
 			""".formatted(
 				notice.customerName(), notice.providerName(), notice.serviceName(),
-				when, price(notice), notice.manageUrl(), publicUrl));
+				when, price(notice), extrasLine(notice), notice.manageUrl(), publicUrl));
 	}
 
 	@Override
@@ -163,6 +163,8 @@ class OutboxNotifier implements Notifier {
 		String vehicle = notice.registrationNumber() == null
 			? ""
 			: "  Fordon: " + plate(notice.registrationNumber()) + "\n";
+		// The extras are what the person in the workshop fetches from the shelf.
+		vehicle = vehicle + extrasLine(notice);
 
 		enqueueTo(providerEmail, notice, "provider_booking_confirmed",
 			"Ny bokning: " + format(notice),
@@ -238,6 +240,11 @@ class OutboxNotifier implements Notifier {
 
 	private static String format(BookingNotice notice) {
 		return WHEN.format(notice.startsAt().atZone(ZONE));
+	}
+
+	/** "  Tillval: Spolarvätska, Däckhotell" on its own line, or nothing. */
+	private static String extrasLine(BookingNotice notice) {
+		return notice.extras() == null || notice.extras().isBlank() ? "" : "  Tillval: " + notice.extras() + "\n";
 	}
 
 	/** ABC123 as ABC 123 -- the way it is on the car. Foreign plates as stored. */

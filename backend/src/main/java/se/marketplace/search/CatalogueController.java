@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import se.marketplace.pricing.Addons;
 import se.marketplace.pricing.PriceRules;
 import se.marketplace.pricing.Quote;
 import se.marketplace.vehicles.RegistrationNumber;
@@ -36,11 +37,14 @@ class CatalogueController {
 	private final NamedParameterJdbcTemplate jdbc;
 	private final PriceRules priceRules;
 	private final Vehicles vehicles;
+	private final Addons addons;
 
-	CatalogueController(NamedParameterJdbcTemplate jdbc, PriceRules priceRules, Vehicles vehicles) {
+	CatalogueController(NamedParameterJdbcTemplate jdbc, PriceRules priceRules, Vehicles vehicles,
+		Addons addons) {
 		this.jdbc = jdbc;
 		this.priceRules = priceRules;
 		this.vehicles = vehicles;
+		this.addons = addons;
 	}
 
 	@GetMapping("/{slug}")
@@ -95,7 +99,8 @@ class CatalogueController {
 				return new ProviderDetail.Service(
 					rs.getLong("id"), rs.getString("name"), rs.getString("category_slug"),
 					rs.getInt("duration_minutes"), quote.priceMinor(), rs.getString("currency"),
-					asks, listPrice, quote.label(), quote.forVehicle());
+					asks, listPrice, quote.label(), quote.forVehicle(),
+					addons.forService(rs.getLong("id")));
 			});
 
 		return ResponseEntity.ok(new ProviderDetail(

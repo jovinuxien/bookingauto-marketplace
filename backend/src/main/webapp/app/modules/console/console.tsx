@@ -74,6 +74,7 @@ const Console = () => {
                   <td>
                     {booking.customerName}
                     <div className="small text-muted">{booking.customerEmail}</div>
+                    {booking.addons && <div className="small text-muted">Tillval: {booking.addons}</div>}
                     {booking.registrationNumber && (
                       <div className="small">
                         <span className="font-monospace">{booking.registrationNumber}</span>

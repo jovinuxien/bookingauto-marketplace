@@ -104,6 +104,9 @@ const ProviderPage = () => {
           >
             <span>
               {candidate.name} · {candidate.durationMinutes} min
+              {candidate.addons.length > 0 && (
+                <small className="d-block opacity-75">Tillval: {candidate.addons.map(a => a.name).join(', ')}</small>
+              )}
             </span>
             <span>
               {formatPrice(candidate.priceMinor, candidate.currency)}

@@ -60,7 +60,7 @@ class ReviewRequests {
 				booking.serviceName(), booking.startsAt(), booking.priceMinor(), booking.currency(),
 				booking.id(), booking.providerId(),
 				links.urlFor(booking.id(), booking.customerEmail()),
-				booking.registrationNumber()));
+				booking.registrationNumber(), null));
 		}
 
 		if (!due.isEmpty()) {

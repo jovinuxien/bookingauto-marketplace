@@ -23,6 +23,8 @@ export interface MyBooking {
   /** What this customer already said, or null. */
   reviewRating: number | null;
   reviewComment: string | null;
+  /** Add-ons chosen at checkout, as sold. */
+  extras: { name: string; priceMinor: number }[];
   /** Still in the future and not already cancelled. */
   cancellable: boolean;
   /** Cancelling right now would return the money. */

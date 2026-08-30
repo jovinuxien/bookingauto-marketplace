@@ -39,7 +39,8 @@ class BookingController {
 			request.customerName(),
 			request.customerEmail(),
 			request.registrationNumber(),
-			request.quotedPriceMinor()));
+			request.quotedPriceMinor(),
+			request.addonIds()));
 		}
 		catch (BookingFunnel.PriceChanged e) {
 			// 409: nothing was reserved; the body carries the price as it is
@@ -79,7 +80,9 @@ class BookingController {
 		/** Only for services whose category asks; ignored otherwise. */
 		String registrationNumber,
 		/** The price the page showed. Optional; when sent, a changed price is a 409. */
-		Integer quotedPriceMinor
+		Integer quotedPriceMinor,
+		/** Add-ons ticked at checkout. */
+		java.util.List<Long> addonIds
 	) {}
 
 	record PriceNow(int priceMinor, String currency) {}

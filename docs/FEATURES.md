@@ -24,6 +24,7 @@ Last revised: 2026-08-30.
 | 1.11 | **Seasonal tyre notice** on `/dackbyte/{city}` with the legal deadline (1 Dec / 15 Apr) chosen by today's date | `TyreSeason` |
 | 1.12 | City index page `/orter` | `landing` |
 | 1.13 | Rate limits on every public write (bookings, lookup, cancel, review, signup, login) | `ratelimit` |
+| 1.15 | **Add-ons at checkout**: a provider offers named extras per service ("Spolarvätska + 49 kr"); the customer ticks them, the total is charged and frozen by name and price, and the work-order mail and console list them. An add-on changes the price, never the duration (ADR 0017) | `pricing` module, db/020 |
 | 1.14 | **Reviews**: two hours after a visit the customer is mailed "Hur var det?" with their booking link; one 1–5 rating (+ optional comment) per booking that actually happened — confirmed and past its end, never cancelled; shown as "Anna A."; average and count on every search hit, landing card and provider page, with the last ten comments | `reviews` module, `POST /api/bookings/review`, `GET /api/reviews/{slug}`, db/019 |
 
 ## 2. Categories (the taxonomy)
@@ -59,7 +60,7 @@ Last revised: 2026-08-30.
 | 4.4 | **`GET /api/vehicles/{plate}`** — plate in, make/model/year/tyres out; 400 not a plate, 404 unknown, 429 over 30/h per IP, 503 + `Retry-After` when the registry is down with nothing cached | `VehicleController` |
 | 4.5 | **Regnr-first search**: a plate box on `/sok` for vehicle categories (and for any search already carrying a plate), on the provider page for services that ask, and pre-filled at checkout — typed once, carried in the URL (`?regnr=`); every outcome but "not a plate" lets the customer go on | `RegnrBox`, ADR 0016 phase 2 |
 | 4.6 | **Per-vehicle pricing**: `service_price_rule` (make / model prefix / year range / rim inches → price + label); most specific wins, ties to the cheaper, no rule = list price; quoted on the provider page for `?regnr=`, re-quoted in the funnel at attempt time, **409 with the new price** if a rule changed since the page | `pricing` module, db/018, ADR 0016 phase 3 |
-| 4.7 | **Console pricing page**: rules per service, add/delete, and "Vad kostar det för ABC 123?" running the real matcher | `/api/console/pricing/**`, `pricing.tsx` |
+| 4.7 | **Console pricing page**: add-ons per service, price rules per vehicle service, and "Vad kostar det för ABC 123?" running the real matcher | `/api/console/pricing/**`, `pricing.tsx` |
 | 4.8 | **`VehicleRegistryPort`** with two adapters: `DisabledVehicleRegistry` (default) and **`TicVehicleRegistry`** (api.tic.io, key in header, 404 = unknown, everything else = unavailable, foreign plates never sent) | `marketplace.vehicles.registry=none|tic` |
 
 ## 5. Platform internals (what keeps the above true)
@@ -77,6 +78,6 @@ Last revised: 2026-08-30.
 
 ## Not built (so nobody assumes it)
 
-Add-on services ·
+
 reschedule · provider-initiated cancellation · workshop widget · messaging ·
 provider subscription tiers · mobile app · consumer accounts (by design, ADR 0014).

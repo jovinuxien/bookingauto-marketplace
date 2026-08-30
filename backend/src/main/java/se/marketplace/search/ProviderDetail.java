@@ -33,7 +33,9 @@ public record ProviderDetail(
 		/** The matching rule's label ("Volvo 2015–2019"), or null. */
 		String priceLabel,
 		/** True when priceMinor is for the car in ?regnr=, not the list price. */
-		boolean pricedForVehicle
+		boolean pricedForVehicle,
+		/** Extras the customer can tick at checkout. */
+		List<se.marketplace.pricing.Addon> addons
 	) {}
 
 }

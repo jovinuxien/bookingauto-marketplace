@@ -70,6 +70,16 @@ class BookingRepository {
 
 		long id = keys.getKey().longValue();
 
+		// The extras, by name and price, frozen with the quote (ADR 0017).
+		for (var addon : request.addons()) {
+			jdbc.update("""
+				INSERT INTO booking_attempt_addon (attempt_id, addon_id, name, price_minor)
+				VALUES (:aid, :addon, :name, :price)
+				""",
+				new MapSqlParameterSource().addValue("aid", id).addValue("addon", addon.id())
+					.addValue("name", addon.name()).addValue("price", addon.priceMinor()));
+		}
+
 		step(id, "-", "STARTED", null, "ok", "quote frozen", false);
 
 		return findById(id).orElseThrow();
@@ -231,6 +241,11 @@ class BookingRepository {
 
 		long bookingId = keys.getKey().longValue();
 
+		jdbc.update("""
+			INSERT INTO booking_addon (booking_id, addon_id, name, price_minor)
+			SELECT :bid, addon_id, name, price_minor FROM booking_attempt_addon WHERE attempt_id = :id
+			""", new MapSqlParameterSource().addValue("bid", bookingId).addValue("id", attempt.id()));
+
 		jdbc.update("UPDATE booking_attempt SET booking_id = :bid WHERE id = :id",
 			new MapSqlParameterSource().addValue("bid", bookingId).addValue("id", attempt.id()));
 
@@ -380,6 +395,20 @@ class BookingRepository {
 	String providerName(long providerId) {
 		return jdbc.queryForObject("SELECT name FROM provider WHERE id = :id",
 			new MapSqlParameterSource("id", providerId), String.class);
+	}
+
+	List<BookingCancellation.Extra> addonsOf(long bookingId) {
+		return jdbc.query("SELECT name, price_minor FROM booking_addon WHERE booking_id = :id ORDER BY name",
+			new MapSqlParameterSource("id", bookingId),
+			(rs, n) -> new BookingCancellation.Extra(rs.getString("name"), rs.getInt("price_minor")));
+	}
+
+	/** "Spolarvätska, Däckhotell" for the mails, or null. */
+	String attemptExtras(long attemptId) {
+		List<String> names = jdbc.query(
+			"SELECT name FROM booking_attempt_addon WHERE attempt_id = :id ORDER BY name",
+			new MapSqlParameterSource("id", attemptId), (rs, n) -> rs.getString("name"));
+		return names.isEmpty() ? null : String.join(", ", names);
 	}
 
 	/**
@@ -595,7 +624,9 @@ class BookingRepository {
 		String customerEmail,
 		String customerName,
 		/** Normalised, or null when the category did not ask. */
-		String registrationNumber
+		String registrationNumber,
+		/** Chosen at checkout, already validated and priced. */
+		List<se.marketplace.pricing.Addon> addons
 	) {}
 
 }

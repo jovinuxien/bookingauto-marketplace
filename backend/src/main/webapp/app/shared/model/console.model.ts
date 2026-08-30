@@ -34,12 +34,15 @@ export interface ConsoleBooking {
   registrationNumber: string | null;
   /** "Volvo V70 (2016)" once looked up; null until then, or forever if no registry. */
   vehicle: string | null;
+  /** "Spolarvätska, Däckhotell" — what to fetch from the shelf; null for none. */
+  addons: string | null;
 }
 
 /** One service on the pricing page, with its rules (ADR 0016). */
 export interface ServicePricing {
   service: { id: number; name: string; priceMinor: number; currency: string; active: boolean; asksVehicle: boolean };
   rules: PriceRule[];
+  addons: { id: number; serviceId: number; name: string; priceMinor: number }[];
 }
 
 export interface PriceRule {

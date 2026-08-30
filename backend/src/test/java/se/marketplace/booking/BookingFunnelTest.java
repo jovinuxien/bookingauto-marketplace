@@ -23,6 +23,8 @@ import se.marketplace.booking.BookingRepository.Attempt;
 import se.marketplace.booking.BookingRepository.NewAttempt;
 import se.marketplace.booking.BookingRepository.ServiceForSale;
 import se.marketplace.notifications.Notifier;
+import se.marketplace.pricing.Addon;
+import se.marketplace.pricing.Addons;
 import se.marketplace.pricing.PriceRules;
 import se.marketplace.pricing.Quote;
 import se.marketplace.vehicles.RegistrationNumber;
@@ -54,6 +56,7 @@ class BookingFunnelTest {
 	private RecordingNotifier notifier;
 	private PriceRules priceRules;
 	private Vehicles vehicles;
+	private Addons addons;
 	private BookingFunnel funnel;
 
 	@BeforeEach
@@ -70,11 +73,13 @@ class BookingFunnelTest {
 
 		priceRules = mock(PriceRules.class);
 		vehicles = mock(Vehicles.class);
+		addons = mock(Addons.class);
+		when(addons.priced(anyLong(), any())).thenReturn(List.of());
 		// List price unless a test says otherwise: the matcher has its own tests.
 		when(priceRules.quote(anyLong(), anyInt(), any())).thenAnswer(call -> Quote.list(call.getArgument(1)));
 
 		funnel = new BookingFunnel(repository, cal, payments,
-			serviceId -> refreshed.add(serviceId), notifier, links, priceRules, vehicles);
+			serviceId -> refreshed.add(serviceId), notifier, links, priceRules, vehicles, addons);
 		ReflectionTestUtils.setField(funnel, "commissionBps", 1500);
 		ReflectionTestUtils.setField(funnel, "timeZone", "Europe/Stockholm");
 		ReflectionTestUtils.setField(funnel, "cancellationCutoffHours", 24);
@@ -82,12 +87,12 @@ class BookingFunnelTest {
 
 	private BookingFunnel.Outcome book() {
 		return funnel.book(new BookingFunnel.BookingRequest(
-			"key-1", 1L, SLOT, "Testkund", "test@example.se", null, null));
+			"key-1", 1L, SLOT, "Testkund", "test@example.se", null, null, null));
 	}
 
 	private BookingFunnel.Outcome bookWithPlate(String plate) {
 		return funnel.book(new BookingFunnel.BookingRequest(
-			"key-1", 1L, SLOT, "Testkund", "test@example.se", plate, null));
+			"key-1", 1L, SLOT, "Testkund", "test@example.se", plate, null, null));
 	}
 
 	// ------------------------------------------------------------ happy path --
@@ -156,7 +161,7 @@ class BookingFunnelTest {
 		when(vehicles.cached(any())).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> funnel.book(new BookingFunnel.BookingRequest(
-				"key-1", 1L, SLOT, "Testkund", "test@example.se", "ABC123", 49900)))
+				"key-1", 1L, SLOT, "Testkund", "test@example.se", "ABC123", 49900, null)))
 			.isInstanceOf(BookingFunnel.PriceChanged.class)
 			.satisfies(e -> assertThat(((BookingFunnel.PriceChanged) e).priceMinor()).isEqualTo(60000));
 		assertThat(repository.started).isNull();
@@ -170,9 +175,36 @@ class BookingFunnelTest {
 		when(vehicles.cached(any())).thenReturn(Optional.empty());
 
 		var outcome = funnel.book(new BookingFunnel.BookingRequest(
-			"key-1", 1L, SLOT, "Testkund", "test@example.se", "ABC123", 60000));
+			"key-1", 1L, SLOT, "Testkund", "test@example.se", "ABC123", 60000, null));
 
 		assertThat(outcome.sold()).isTrue();
+	}
+
+	@Test
+	@DisplayName("add-ons are priced by us from ids, added to the total, and frozen")
+	void addonsAreAdded() {
+		when(addons.priced(1L, List.of(7L, 8L))).thenReturn(List.of(
+			new Addon(7L, 1L, "Spolarvätska", 4900), new Addon(8L, 1L, "Däckhotell", 89000)));
+
+		var outcome = funnel.book(new BookingFunnel.BookingRequest(
+			"key-1", 1L, SLOT, "Testkund", "test@example.se", null, 153900, List.of(7L, 8L)));
+
+		assertThat(outcome.sold()).isTrue();
+		assertThat(repository.started.priceMinor()).isEqualTo(60000 + 4900 + 89000);
+		assertThat(repository.startedWith.addons()).extracting(Addon::name).containsExactly("Spolarvätska", "Däckhotell");
+		// 15% of the total, not of the list price.
+		assertThat(repository.started.commissionMinor()).isEqualTo(Math.round(153900 * 0.15f));
+	}
+
+	@Test
+	@DisplayName("an add-on that is not this service's is refused before anything is reserved")
+	void unknownAddonRefused() {
+		when(addons.priced(1L, List.of(99L))).thenThrow(new IllegalArgumentException("Ett tillval finns inte längre."));
+
+		assertThatThrownBy(() -> funnel.book(new BookingFunnel.BookingRequest(
+				"key-1", 1L, SLOT, "Testkund", "test@example.se", null, null, List.of(99L))))
+			.isInstanceOf(IllegalArgumentException.class);
+		assertThat(cal.reserved).isZero();
 	}
 
 	@Test
@@ -524,6 +556,7 @@ class BookingFunnelTest {
 
 		private final List<AttemptState> transitions = new ArrayList<>();
 		private Attempt started;
+		private NewAttempt startedWith;
 		private boolean asksVehicle;
 		Attempt current;
 		private int misses;
@@ -550,6 +583,7 @@ class BookingFunnelTest {
 
 		@Override
 		Attempt start(NewAttempt request) {
+			startedWith = request;
 			started = new Attempt(1L, request.idempotencyKey(), request.providerId(),
 				request.serviceId(), request.slotStart(), request.priceMinor(),
 				request.commissionMinor(), request.currency(), request.customerEmail(),
@@ -557,6 +591,12 @@ class BookingFunnelTest {
 				request.registrationNumber());
 			current = started;
 			return started;
+		}
+
+		@Override
+		String attemptExtras(long attemptId) {
+			return startedWith == null || startedWith.addons().isEmpty() ? null
+				: String.join(", ", startedWith.addons().stream().map(Addon::name).toList());
 		}
 
 		@Override

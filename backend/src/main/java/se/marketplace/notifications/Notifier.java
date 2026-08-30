@@ -95,7 +95,9 @@ public interface Notifier {
 		Long providerId,
 		String manageUrl,
 		/** Normalised plate, or null when the service did not ask for one. */
-		String registrationNumber
+		String registrationNumber,
+		/** The add-ons chosen, "Spolarvätska, Däckhotell", or null. */
+		String extras
 	) {}
 
 }

@@ -19,7 +19,7 @@ const Pricing = () => {
 
   const load = () =>
     axios.get<ServicePricing[]>('/console/pricing').then(
-      response => setServices(response.data.filter(s => s.service.asksVehicle)),
+      response => setServices(response.data),
       () => setError('Kunde inte hämta prislistan.'),
     );
 
@@ -31,10 +31,11 @@ const Pricing = () => {
 
   return (
     <>
-      <h2 className="h6 mt-5">Priser per bil</h2>
+      <h2 className="h6 mt-5">Priser och tillval</h2>
       <p className="text-muted small">
-        Listpriset gäller när ingen regel passar. Den mest specifika regeln vinner; vid lika
-        specificitet det lägre priset.
+        Ett tillval ändrar priset, inte tiden — det som tar extra minuter läggs upp som en egen
+        tjänst i Cal. För fordonstjänster gäller listpriset när ingen regel passar; den mest
+        specifika regeln vinner, vid lika specificitet det lägre priset.
       </p>
       {error && <div className="alert alert-warning">{error}</div>}
       {services.map(entry => (
@@ -45,7 +46,28 @@ const Pricing = () => {
 };
 
 const ServiceRules = ({ entry, onChange }: { entry: ServicePricing; onChange: () => void }) => {
-  const { service, rules } = entry;
+  const { service, rules, addons } = entry;
+  const [addonForm, setAddonForm] = useState({ name: '', price: '' });
+  const [addonProblem, setAddonProblem] = useState<string | null>(null);
+
+  const addAddon = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setAddonProblem(null);
+    try {
+      await axios.post(`/console/pricing/${service.id}/addons`, {
+        name: addonForm.name, priceMinor: Math.round(Number(addonForm.price || 0) * 100) });
+      setAddonForm({ name: '', price: '' });
+      onChange();
+    } catch (e) {
+      const failure = e as ApiError;
+      setAddonProblem(typeof failure.data === 'string' ? failure.data : 'Tillvalet kunde inte sparas.');
+    }
+  };
+
+  const retireAddon = async (id: number) => {
+    await axios.delete(`/console/pricing/addons/${id}`);
+    onChange();
+  };
   const [form, setForm] = useState<Record<string, string>>({});
   const [problem, setProblem] = useState<string | null>(null);
   const [plate, setPlate] = useState('');
@@ -100,6 +122,30 @@ const ServiceRules = ({ entry, onChange }: { entry: ServicePricing; onChange: ()
           <span>Listpris {formatPrice(service.priceMinor, service.currency)}</span>
         </div>
 
+        <div className="mt-2 small text-muted">Tillval</div>
+        {addons.length > 0 && (
+          <ul className="list-unstyled mb-1">
+            {addons.map(addon => (
+              <li key={addon.id} className="d-flex justify-content-between">
+                <span>{addon.name}</span>
+                <span>+ {formatPrice(addon.priceMinor, service.currency)}
+                  <button className="btn btn-link btn-sm p-0 ms-2" type="button" onClick={() => retireAddon(addon.id)}>Ta bort</button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <form className="d-flex flex-wrap gap-1 align-items-center mb-2" onSubmit={addAddon}>
+          <input className="form-control form-control-sm" style={{ width: '12rem' }} placeholder="Tillval, t.ex. Spolarvätska"
+            value={addonForm.name} onChange={e => setAddonForm({ ...addonForm, name: e.target.value })} aria-label="Tillvalets namn" />
+          <input className="form-control form-control-sm" style={{ width: '6rem' }} type="number" placeholder="Pris kr"
+            value={addonForm.price} onChange={e => setAddonForm({ ...addonForm, price: e.target.value })} aria-label="Tillvalets pris" />
+          <button className="btn btn-sm btn-outline-primary" type="submit" disabled={!addonForm.name.trim()}>Lägg till tillval</button>
+        </form>
+        {addonProblem && <div className="text-danger small">{addonProblem}</div>}
+
+        {service.asksVehicle && (<>
+        <div className="mt-2 small text-muted">Priser per bil</div>
         {rules.length > 0 && (
           <table className="table table-sm mt-2 mb-2">
             <tbody>
@@ -142,6 +188,7 @@ const ServiceRules = ({ entry, onChange }: { entry: ServicePricing; onChange: ()
             </span>
           )}
         </form>
+        </>)}
       </div>
     </div>
   );

@@ -368,6 +368,11 @@ class BookingCancellationTest {
 		}
 
 		@Override
+		List<BookingCancellation.Extra> addonsOf(long bookingId) {
+			return List.of();
+		}
+
+		@Override
 		Optional<ConsumerBooking> findBookingForCustomer(long id) {
 			reads++;
 			return Optional.ofNullable(bookings.get(id));

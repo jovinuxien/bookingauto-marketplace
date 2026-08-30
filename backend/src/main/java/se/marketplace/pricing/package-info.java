@@ -9,6 +9,9 @@
  * for the same reason: it runs on a page a customer is looking at and on
  * the checkout path, and neither may wait on a third party.
  *
+ * <p>Also the add-ons (ADR 0017): named extras per service that change the
+ * price and never the length.
+ *
  * <p>Read by {@code search} (the provider page), {@code booking} (the
  * funnel re-quotes at attempt time) and {@code console} (the provider edits
  * its rules). Money is written only here (ADR 0003): the import from Cal
