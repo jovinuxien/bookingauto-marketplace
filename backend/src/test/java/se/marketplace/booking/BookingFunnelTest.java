@@ -738,6 +738,17 @@ class BookingFunnelTest {
 		}
 
 		@Override
+		public void bookingRescheduled(BookingNotice notice, java.time.Instant from) {
+			// not exercised here
+		}
+
+		@Override
+		public void providerBookingRescheduled(BookingNotice notice, String providerEmail,
+			java.time.Instant from) {
+			// not exercised here
+		}
+
+		@Override
 		public void reviewRequested(BookingNotice notice) {
 			// not exercised here
 		}

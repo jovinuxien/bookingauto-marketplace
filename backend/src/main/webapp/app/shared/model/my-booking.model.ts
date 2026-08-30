@@ -6,6 +6,8 @@
  * — and both are values that end up in screenshots and support threads.
  */
 export interface MyBooking {
+  /** The service, so the page can fetch other free times to move to. */
+  serviceId: number;
   providerName: string;
   city: string;
   serviceName: string;
@@ -25,6 +27,8 @@ export interface MyBooking {
   reviewComment: string | null;
   /** Add-ons chosen at checkout, as sold. */
   extras: { name: string; priceMinor: number }[];
+  /** Confirmed and before the cutoff: the time can still be moved. */
+  reschedulable: boolean;
   /** Still in the future and not already cancelled. */
   cancellable: boolean;
   /** Cancelling right now would return the money. */

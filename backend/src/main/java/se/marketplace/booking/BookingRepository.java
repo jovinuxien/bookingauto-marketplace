@@ -356,6 +356,31 @@ class BookingRepository {
 	 * nothing — which is the one thing that must not happen after money has
 	 * moved.
 	 */
+	int rescheduleCount(long id) {
+		Integer n = jdbc.queryForObject("SELECT rescheduled_count FROM booking WHERE id = :id",
+			new MapSqlParameterSource("id", id), Integer.class);
+		return n == null ? 0 : n;
+	}
+
+	/** Guarded on status and the old uid, so a concurrent cancel or move wins and this returns 0. */
+	int reschedule(long id, String oldUid, String newUid, java.time.Instant startsAt, java.time.Instant endsAt) {
+		return jdbc.update("""
+			UPDATE booking
+			   SET cal_booking_uid = :newUid,
+			       rescheduled_from = starts_at,
+			       starts_at = :startsAt,
+			       ends_at = :endsAt,
+			       rescheduled_count = rescheduled_count + 1,
+			       rescheduled_at = now(),
+			       updated_at = now()
+			 WHERE id = :id AND status = 'confirmed' AND cal_booking_uid = :oldUid
+			""",
+			new MapSqlParameterSource()
+				.addValue("id", id).addValue("oldUid", oldUid).addValue("newUid", newUid)
+				.addValue("startsAt", java.sql.Timestamp.from(startsAt))
+				.addValue("endsAt", java.sql.Timestamp.from(endsAt)));
+	}
+
 	void settleCancellation(long id, String status, String refundRef, boolean needsAttention) {
 		jdbc.update("""
 			UPDATE booking

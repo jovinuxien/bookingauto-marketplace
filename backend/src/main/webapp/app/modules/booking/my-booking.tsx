@@ -2,7 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { useAppDispatch, useAppSelector } from 'app/config/store';
-import { cancelBooking, loadBooking, submitReview } from 'app/shared/reducers/my-booking.reducer';
+import { cancelBooking, loadBooking, rescheduleBooking, submitReview } from 'app/shared/reducers/my-booking.reducer';
+import axios from 'app/config/axiosinstance';
+import type { DaySlots } from 'app/shared/model/marketplace.model';
+import { addDays, todayInZone } from 'app/shared/util/format';
 import { formatDay, formatPrice, formatTime } from 'app/shared/util/format';
 
 /**
@@ -18,8 +21,18 @@ const MyBooking = () => {
   const [params] = useSearchParams();
   const token = params.get('token');
 
-  const { loading, booking, error, cancelling, cancelError, justCancelled, reviewing, reviewError } =
-    useAppSelector(state => state.myBooking);
+  const { loading, booking, error, cancelling, cancelError, justCancelled, reviewing, reviewError,
+    rescheduling, rescheduleError, justMoved } = useAppSelector(state => state.myBooking);
+  const [moving, setMoving] = useState(false);
+  const [moveDay, setMoveDay] = useState(todayInZone());
+  const [slots, setSlots] = useState<DaySlots | null>(null);
+  useEffect(() => {
+    if (moving && booking) {
+      setSlots(null);
+      axios.get<DaySlots>(`/services/${booking.serviceId}/slots`, { params: { day: moveDay } })
+        .then(r => setSlots(r.data), () => setSlots({ serviceId: booking.serviceId, day: moveDay, starts: [] }));
+    }
+  }, [moving, moveDay, booking]);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
 
@@ -69,6 +82,11 @@ const MyBooking = () => {
         </h1>
         <p className="text-muted small mb-4">{booking.city}</p>
 
+        {justMoved && (
+          <div className="alert alert-success">
+            Tiden är flyttad. Bekräftelse skickas till din e-post.
+          </div>
+        )}
         {justCancelled && (
           <div className="alert alert-success">
             {booking.status === 'refunded' ? (
@@ -110,6 +128,46 @@ const MyBooking = () => {
           )}
           <Row label="Status" value={<Status status={booking.status} />} />
         </dl>
+
+        {rescheduleError && <div className="alert alert-warning">{rescheduleError}</div>}
+
+        {booking.reschedulable && !moving && (
+          <p>
+            <button className="btn btn-outline-primary" type="button" onClick={() => setMoving(true)}>
+              Boka om tiden
+            </button>
+          </p>
+        )}
+
+        {booking.reschedulable && moving && (
+          <div className="card card-body mb-3">
+            <h2 className="h6">Välj en ny tid</h2>
+            <div className="d-flex align-items-center gap-2 mb-2">
+              <div className="btn-group">
+                <button className="btn btn-outline-secondary btn-sm" type="button"
+                  onClick={() => setMoveDay(addDays(moveDay, -1))}>‹</button>
+                <span className="btn btn-light btn-sm disabled text-dark">{formatDay(`${moveDay}T12:00:00Z`)}</span>
+                <button className="btn btn-outline-secondary btn-sm" type="button"
+                  onClick={() => setMoveDay(addDays(moveDay, 1))}>›</button>
+              </div>
+              <button className="btn btn-link btn-sm" type="button" onClick={() => setMoving(false)}>Avbryt</button>
+            </div>
+            {!slots && <p className="text-muted small mb-0">Hämtar tider…</p>}
+            {slots && slots.starts.length === 0 && (
+              <p className="text-muted small mb-0">Inga lediga tider den här dagen.</p>
+            )}
+            {slots && slots.starts.length > 0 && (
+              <div className="d-flex flex-wrap gap-2">
+                {slots.starts.map(start => (
+                  <button key={start} className="btn btn-sm btn-outline-primary" type="button" disabled={rescheduling}
+                    onClick={() => { if (token) { dispatch(rescheduleBooking({ token, slotStart: start })); setMoving(false); } }}>
+                    {formatTime(start)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {cancelError && <div className="alert alert-warning">{cancelError}</div>}
 

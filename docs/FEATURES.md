@@ -24,6 +24,7 @@ Last revised: 2026-08-30.
 | 1.11 | **Seasonal tyre notice** on `/dackbyte/{city}` with the legal deadline (1 Dec / 15 Apr) chosen by today's date | `TyreSeason` |
 | 1.12 | City index page `/orter` | `landing` |
 | 1.13 | Rate limits on every public write (bookings, lookup, cancel, review, signup, login) | `ratelimit` |
+| 1.16 | **Reschedule**: before the cancellation cutoff the customer moves a confirmed booking to another free time from the same link — new slot held in Cal before the old is released, so there is never a moment with no appointment; same price, no new charge; at most 3 moves; both parties mailed with old and new time | `POST /api/bookings/reschedule`, db/021 |
 | 1.15 | **Add-ons at checkout**: a provider offers named extras per service ("Spolarvätska + 49 kr"); the customer ticks them, the total is charged and frozen by name and price, and the work-order mail and console list them. An add-on changes the price, never the duration (ADR 0017) | `pricing` module, db/020 |
 | 1.14 | **Reviews**: two hours after a visit the customer is mailed "Hur var det?" with their booking link; one 1–5 rating (+ optional comment) per booking that actually happened — confirmed and past its end, never cancelled; shown as "Anna A."; average and count on every search hit, landing card and provider page, with the last ten comments | `reviews` module, `POST /api/bookings/review`, `GET /api/reviews/{slug}`, db/019 |
 
@@ -79,5 +80,5 @@ Last revised: 2026-08-30.
 ## Not built (so nobody assumes it)
 
 
-reschedule · provider-initiated cancellation · workshop widget · messaging ·
+Provider-initiated cancellation · workshop widget · messaging ·
 provider subscription tiers · mobile app · consumer accounts (by design, ADR 0014).

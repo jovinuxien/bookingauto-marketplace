@@ -20,6 +20,9 @@ interface MyBookingState {
   /** Why the cancellation did not happen. The booking is still on screen. */
   cancelError: string | null;
   reviewing: boolean;
+  rescheduling: boolean;
+  rescheduleError: string | null;
+  justMoved: boolean;
   /** Why the rating was not saved. */
   reviewError: string | null;
   /** True for the one render after a successful cancellation. */
@@ -33,6 +36,9 @@ const initialState: MyBookingState = {
   cancelling: false,
   cancelError: null,
   reviewing: false,
+  rescheduling: false,
+  rescheduleError: null,
+  justMoved: false,
   reviewError: null,
   justCancelled: false,
 };
@@ -54,6 +60,31 @@ interface CancelFailure {
   booking?: MyBooking;
   message: string;
 }
+
+interface RescheduleFailure {
+  booking?: MyBooking;
+  message: string;
+}
+
+export const rescheduleBooking = createAsyncThunk<
+  MyBooking,
+  { token: string; slotStart: string },
+  { rejectValue: RescheduleFailure }
+>('myBooking/reschedule', async (request, { rejectWithValue }) => {
+  try {
+    const response = await axios.post<MyBooking>('/bookings/reschedule', request);
+    return response.data;
+  } catch (error) {
+    const failure = error as ApiError;
+    const booking = failure.data && typeof failure.data === 'object' ? (failure.data as MyBooking) : undefined;
+    const message =
+      failure.status === 409 && booking && !booking.reschedulable ? 'Tiden kan inte längre flyttas.' :
+      failure.status === 409 ? 'Den tiden hann bli tagen. Välj en annan.' :
+      failure.status === 502 ? 'Kalendern svarar inte just nu. Din gamla tid gäller — prova igen om en stund.' :
+      'Tiden kunde inte flyttas.';
+    return rejectWithValue({ booking, message });
+  }
+});
 
 export const submitReview = createAsyncThunk<
   { rating: number },
@@ -134,6 +165,22 @@ const myBookingSlice = createSlice({
         state.cancelling = false;
         state.booking = action.payload;
         state.justCancelled = true;
+      })
+      .addCase(rescheduleBooking.pending, state => {
+        state.rescheduling = true;
+        state.rescheduleError = null;
+      })
+      .addCase(rescheduleBooking.fulfilled, (state, action) => {
+        state.rescheduling = false;
+        state.booking = action.payload;
+        state.justMoved = true;
+      })
+      .addCase(rescheduleBooking.rejected, (state, action) => {
+        state.rescheduling = false;
+        state.rescheduleError = action.payload?.message ?? 'Tiden kunde inte flyttas.';
+        if (action.payload?.booking) {
+          state.booking = action.payload.booking;
+        }
       })
       .addCase(submitReview.pending, state => {
         state.reviewing = true;

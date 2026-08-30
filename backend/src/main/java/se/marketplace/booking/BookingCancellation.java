@@ -257,11 +257,12 @@ public class BookingCancellation {
 		}
 	}
 
-	private ConsumerView view(BookingRepository.ConsumerBooking booking, Instant now) {
+	ConsumerView view(BookingRepository.ConsumerBooking booking, Instant now) {
 		boolean confirmed = booking.confirmed();
 
 		Optional<Review> review = confirmed ? reviews.forBooking(booking.id()) : Optional.empty();
 		return new ConsumerView(
+			booking.serviceId(),
 			booking.providerName(),
 			booking.city(),
 			booking.serviceName(),
@@ -272,6 +273,7 @@ public class BookingCancellation {
 			booking.status(),
 			booking.customerName(),
 			confirmed && now.isBefore(booking.startsAt()),
+			confirmed && refundDue(booking, now),
 			confirmed && refundDue(booking, now),
 			freeUntil(booking),
 			booking.cancellationCutoffHours(),
@@ -306,6 +308,8 @@ public class BookingCancellation {
 	 * are values that turn up in support conversations and screenshots.
 	 */
 	public record ConsumerView(
+		/** The service, so the page can fetch other free times to move to. */
+		long serviceId,
 		String providerName,
 		String city,
 		String serviceName,
@@ -317,6 +321,8 @@ public class BookingCancellation {
 		String customerName,
 		boolean cancellable,
 		boolean refundable,
+		/** Confirmed, and before the cutoff: the time can still be moved. */
+		boolean reschedulable,
 		Instant freeUntil,
 		int cutoffHours,
 		boolean needsAttention,

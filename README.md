@@ -321,6 +321,7 @@ db/017                 a car is asked about once, and remembered (ADR 0016)
 db/018                 a service has a list price and zero or more rules
 db/019                 what the customer thought, once they have been
 db/020                 something extra, chosen at checkout (ADR 0017)
+db/021                 a time can be moved, before the cutoff
 backend/               Spring Modulith: search, sync, booking, payments,
                        onboarding, console, signup, landing, notifications, geo,
                        ai (whether a model may be called; no agents live there),

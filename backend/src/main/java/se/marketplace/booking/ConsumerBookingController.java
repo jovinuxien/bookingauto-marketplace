@@ -35,10 +35,31 @@ class ConsumerBookingController {
 	private final BookingCancellation cancellation;
 
 	private final BookingReviews reviews;
+	private final BookingReschedule reschedule;
 
-	ConsumerBookingController(BookingCancellation cancellation, BookingReviews reviews) {
+	ConsumerBookingController(BookingCancellation cancellation, BookingReviews reviews,
+		BookingReschedule reschedule) {
 		this.cancellation = cancellation;
 		this.reviews = reviews;
+		this.reschedule = reschedule;
+	}
+
+	@PostMapping("/reschedule")
+	ResponseEntity<?> reschedule(@RequestBody RescheduleRequest request, HttpServletRequest http) {
+		if (request.slotStart() == null || request.slotStart().isBlank()) {
+			return ResponseEntity.badRequest().build();
+		}
+		return switch (reschedule.move(request.token(), java.time.Instant.parse(request.slotStart()), clientIp(http))) {
+			case BookingReschedule.Moved moved -> ResponseEntity.ok(moved.booking());
+			// 409: the slot went while they were choosing. The body carries the
+			// unmoved booking so the page keeps showing something true.
+			case BookingReschedule.SlotTaken taken -> ResponseEntity.status(HttpStatus.CONFLICT).body(taken.booking());
+			case BookingReschedule.TooLate late -> ResponseEntity.status(HttpStatus.CONFLICT).body(late.booking());
+			case BookingReschedule.TooMany many -> ResponseEntity.status(HttpStatus.CONFLICT).body(many.booking());
+			case BookingReschedule.Unavailable unavailable -> ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(unavailable.booking());
+			case BookingReschedule.Unknown ignored -> ResponseEntity.notFound().build();
+			case BookingReschedule.Throttled ignored -> ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
+		};
 	}
 
 	@PostMapping("/review")
@@ -114,5 +135,7 @@ class ConsumerBookingController {
 	record TokenRequest(String token) {}
 
 	record ReviewRequest(String token, int rating, String comment) {}
+
+	record RescheduleRequest(String token, String slotStart) {}
 
 }

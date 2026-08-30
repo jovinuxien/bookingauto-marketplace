@@ -183,6 +183,45 @@ class OutboxNotifier implements Notifier {
 	}
 
 	@Override
+	public void bookingRescheduled(BookingNotice notice, java.time.Instant from) {
+		enqueue(notice, "booking_rescheduled",
+			"Din tid hos " + notice.providerName() + " är flyttad",
+			"""
+			Hej %s,
+
+			Din tid är flyttad.
+
+			  %s
+			  %s
+			  Ny tid: %s
+			  (tidigare %s)
+
+			Behöver du ändra något mer gör du det här:
+			%s
+			""".formatted(notice.customerName(), notice.providerName(), notice.serviceName(),
+				format(notice), WHEN.format(from.atZone(ZONE)), notice.manageUrl()));
+	}
+
+	@Override
+	public void providerBookingRescheduled(BookingNotice notice, String providerEmail,
+		java.time.Instant from) {
+		enqueueTo(providerEmail, notice, "provider_booking_rescheduled",
+			"Flyttad tid: " + format(notice),
+			"""
+			Hej,
+
+			%s har flyttat sin tid.
+
+			  %s
+			  Ny tid: %s
+			  Tidigare: %s
+			%s
+			Den gamla tiden är ledig igen och kan bokas av någon annan.
+			""".formatted(notice.customerName(), notice.serviceName(), format(notice),
+				WHEN.format(from.atZone(ZONE)), extrasLine(notice)));
+	}
+
+	@Override
 	public void reviewRequested(BookingNotice notice) {
 		enqueue(notice, "review_requested",
 			"Hur var det hos " + notice.providerName() + "?",

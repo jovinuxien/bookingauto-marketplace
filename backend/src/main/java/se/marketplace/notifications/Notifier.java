@@ -70,6 +70,12 @@ public interface Notifier {
 	 */
 	void bookingNeedsAttention(BookingNotice notice);
 
+	/** The customer moved the time. The notice carries the new time; {@code from} is the old one. */
+	void bookingRescheduled(BookingNotice notice, java.time.Instant from);
+
+	/** The salon's copy of the move — the old work slot is free, the new one is taken. */
+	void providerBookingRescheduled(BookingNotice notice, String providerEmail, java.time.Instant from);
+
 	/** "Hur var det?" — sent once, a while after the appointment, with the link to rate it. */
 	void reviewRequested(BookingNotice notice);
 
