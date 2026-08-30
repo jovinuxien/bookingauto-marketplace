@@ -27,6 +27,12 @@ class CategoryMatchingTest {
 	private static final Category MASSAGE = category("massage", "massage", "Massage",
 		"massage", "taktil massage", "ryggmassage");
 
+	private static final Category DACK = category("dack", "dackbyte", "Däckbyte",
+		"däckbyte", "däckskifte");
+
+	private static final Category CYKEL = category("cykel", "cykelservice", "Cykelservice",
+		"cykel", "däckbyte cykel", "punktering cykel");
+
 	private static final Category HUD = category("hud", "hudvard", "Hudvård",
 		"ansiktsbehandling", "vaxning", "fransar");
 
@@ -125,6 +131,30 @@ class CategoryMatchingTest {
 		assertThat(HUD.slug()).isEqualTo("hud");
 		assertThat(HUD.path()).isEqualTo("hudvard");
 		assertThat(HAR.slug()).isNotEqualTo(HAR.path());
+	}
+
+
+	/**
+	 * A bicycle phrase that contains a car word is a bicycle phrase.
+	 *
+	 * <p>The longest synonym wins, which is the whole reason the cykel list
+	 * (db/015) spells "däckbyte cykel" out in full rather than trusting
+	 * "cykel" alone to outweigh "däckbyte".
+	 */
+	@Test
+	@DisplayName("a bicycle tyre change is not a car tyre change")
+	void bicycleBeatsCarOnTheLongerMatch() {
+		Categories categories = new Categories(null) {
+			@Override
+			public List<Category> all() {
+				return List.of(DACK, CYKEL);
+			}
+		};
+
+		assertThat(categories.classify("Däckbyte cykel 30 min").map(Category::slug)).contains("cykel");
+		assertThat(categories.classify("Däckbyte 30 min").map(Category::slug)).contains("dack");
+		// A generic word alone matches nothing; the provider's default decides.
+		assertThat(categories.classify("Service")).isEmpty();
 	}
 
 }

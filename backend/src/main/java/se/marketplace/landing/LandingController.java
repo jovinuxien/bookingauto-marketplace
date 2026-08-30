@@ -46,7 +46,7 @@ class LandingController {
 	 */
 	private static final ZoneId STOCKHOLM = ZoneId.of("Europe/Stockholm");
 
-	static final String CATEGORY_PATHS = "frisor|massage|hudvard|dackbyte|bilservice|bilvard|bilglas";
+	static final String CATEGORY_PATHS = "frisor|massage|hudvard|dackbyte|bilservice|bilvard|bilglas|cykelservice";
 
 	private final LandingRepository repository;
 	private final ViteManifest manifest;

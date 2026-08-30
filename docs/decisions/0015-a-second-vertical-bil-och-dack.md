@@ -98,11 +98,14 @@ what comes later without renumbering.
   `AutoRepair` in the page's JSON-LD and counts "verkstäder" rather than
   "salonger" — a `vehicle` flag on `Category`, read from `db/013`'s
   `asks_vehicle`, so no page holds its own list of which slugs are cars.
-- **Cykel.** Bokamera lists bike repair and it is the same shape. It is left
-  out because its natural synonyms — "punktering", "service" — collide with
-  the vehicle ones, and a bicycle shop's "Punktering" landing in `dack` is
-  worse than it landing in the default. It needs its own words chosen with
-  care, which is a small job and a separate one.
+- **Cykel** — deferred here, then done in `db/015`, once the signup-time
+  default existed to catch generic titles. The rule that made it safe:
+  synonyms are for words that identify a category on their own, and generic
+  words belong to nobody — `bilservice` gave up `service`, `reparation` and
+  `verkstad`, and a bike shop's "Service" now lands where the shop said at
+  signup rather than in a car workshop's category. Bicycle phrases that
+  contain car words ("däckbyte cykel") are listed in full so the longer
+  match wins.
 
 ### The one new third party goes behind a port
 
@@ -156,9 +159,9 @@ hierarchy" — worth watching, not worth solving yet.
   waiting for something to sweep with.
 - **Synonym collisions across verticals.** `vaxning` is skincare and also
   what a detailer does to paint; it stays with `hud`, and car wax is
-  `lackskydd` / `polering`. `service` on its own is claimed by `bilservice`
-  because "Service 15 000 km" is how workshops name the thing, and no salon
-  names an event type "Service". The day one does, the import result shows it.
+  `lackskydd` / `polering`. Generic words (`service`, `reparation`) belong
+  to no category since `db/015`; a title that is only a generic word lands
+  in the provider's signup default, which is the right place for it.
 - **The default, for operators.** Self-serve providers choose one; an
   operator creating a provider by hand may leave it out and gets the
   configured `har`. Visible in the import result; nothing makes them look.
