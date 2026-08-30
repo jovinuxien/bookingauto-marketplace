@@ -210,6 +210,18 @@ marketplace:
     batch-size: ${MARKETPLACE_VEHICLES_BATCH_SIZE:20}
     interval-ms: ${MARKETPLACE_VEHICLES_INTERVAL_MS:300000}
 
+    # The cache in front of the registry (ADR 0016). A found car is trusted
+    # for a year -- tyres and plates change hands -- and "not known" for a
+    # month, because new cars are registered every day.
+    cache:
+      known-days: ${MARKETPLACE_VEHICLES_CACHE_KNOWN_DAYS:365}
+      unknown-days: ${MARKETPLACE_VEHICLES_CACHE_UNKNOWN_DAYS:30}
+
+    # GET /api/vehicles/{plate} is a paid call behind a free URL. Thirty an
+    # hour is more cars than a household owns and fewer than a script wants.
+    lookups-per-ip-per-hour: ${MARKETPLACE_VEHICLES_LOOKUPS_PER_IP_PER_HOUR:30}
+    retry-after-seconds: ${MARKETPLACE_VEHICLES_RETRY_AFTER_SECONDS:60}
+
   geocoding:
     # 'none' by default, and that is not laziness. Enabling a geocoder by
     # default would point every developer machine and every CI run at a public

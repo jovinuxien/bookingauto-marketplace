@@ -317,6 +317,7 @@ db/013                 which car is coming -- the plate, and a port for the rest
 db/014                 the workshop hears about a sale, with the plate on it
 db/015                 cykel, and generic words belong to nobody
 db/016                 the tyre dimension, front and rear -- why TIC was chosen
+db/017                 a car is asked about once, and remembered (ADR 0016)
 backend/               Spring Modulith: search, sync, booking, payments,
                        onboarding, console, signup, landing, notifications, geo,
                        ai (whether a model may be called; no agents live there),

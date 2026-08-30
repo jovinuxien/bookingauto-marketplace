@@ -43,7 +43,11 @@ class BookingVehiclesTest {
 	void setUp() {
 		repository = mock(VehicleLookupRepository.class);
 		registry = new StubRegistry();
-		vehicles = new BookingVehicles(repository, registry);
+		// The cache is empty and stays empty (a mock), so every lookup reaches
+		// the stub registry -- the cache has its own test.
+		Vehicles through = new Vehicles(mock(VehicleCacheRepository.class), registry);
+		ReflectionTestUtils.setField(through, "source", "stub");
+		vehicles = new BookingVehicles(repository, through);
 
 		ReflectionTestUtils.setField(vehicles, "maxAttempts", 3);
 		ReflectionTestUtils.setField(vehicles, "batchSize", 20);

@@ -5,7 +5,7 @@ who it is for. Derived from the controllers, schedulers, templates and
 migrations rather than from memory — if it is not here, it is not built.
 Update this file in the same commit as the feature.
 
-Last revised: 2026-08-30 (commit `07a139e`).
+Last revised: 2026-08-30.
 
 ## 1. For the customer (consumer site, no account needed)
 
@@ -54,7 +54,9 @@ Last revised: 2026-08-30 (commit `07a139e`).
 |---|---|---|
 | 4.1 | Plate normalised (`abc-123` → `ABC123`), Swedish format recognised, foreign plates accepted | `RegistrationNumber` |
 | 4.2 | **Registry lookup after confirmation** (never on the booking path): make, model, year, **tyre dimension front/rear** written onto the booking by a sweep with bounded retries | `BookingVehicles`, db/013, 016 |
-| 4.3 | **`VehicleRegistryPort`** with two adapters: `DisabledVehicleRegistry` (default) and **`TicVehicleRegistry`** (api.tic.io, key in header, 404 = unknown, everything else = unavailable, foreign plates never sent) | `marketplace.vehicles.registry=none|tic` |
+| 4.3 | **Vehicle cache** — a plate is asked of the registry once and remembered (found for a year, unknown for a month); stale rows are served when the registry is down; the sweep and the endpoint both read through it | `Vehicles`, `vehicle` table (db/017, ADR 0016) |
+| 4.4 | **`GET /api/vehicles/{plate}`** — plate in, make/model/year/tyres out; 400 not a plate, 404 unknown, 429 over 30/h per IP, 503 + `Retry-After` when the registry is down with nothing cached | `VehicleController` |
+| 4.5 | **`VehicleRegistryPort`** with two adapters: `DisabledVehicleRegistry` (default) and **`TicVehicleRegistry`** (api.tic.io, key in header, 404 = unknown, everything else = unavailable, foreign plates never sent) | `marketplace.vehicles.registry=none|tic` |
 
 ## 5. Platform internals (what keeps the above true)
 
@@ -71,6 +73,6 @@ Last revised: 2026-08-30 (commit `07a139e`).
 
 ## Not built (so nobody assumes it)
 
-Reviews/ratings · per-vehicle pricing and regnr-first search (designed, ADR 0016) · add-on services ·
+Reviews/ratings · regnr box on `/sok` and per-vehicle pricing (ADR 0016 phases 2–3; the cache and endpoint exist) · add-on services ·
 reschedule · provider-initiated cancellation · workshop widget · messaging ·
 provider subscription tiers · mobile app · consumer accounts (by design, ADR 0014).

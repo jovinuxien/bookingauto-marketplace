@@ -1,6 +1,6 @@
 # 16. The car is the query, and the price depends on it
 
-**Status:** proposed
+**Status:** accepted — phase 1 (the cache and `GET /api/vehicles/{plate}`) built in `db/017`; phases 2–3 (the search box, price rules) pending
 
 **Builds on** ADR 0015, which put the registration number on the booking and
 a registry behind a port, and on ADR 0003, which says money is written only

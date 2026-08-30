@@ -27,7 +27,7 @@ class BookingVehicles {
 	private static final Logger log = LoggerFactory.getLogger(BookingVehicles.class);
 
 	private final VehicleLookupRepository repository;
-	private final VehicleRegistryPort registry;
+	private final Vehicles vehicles;
 
 	@Value("${marketplace.vehicles.max-attempts:3}")
 	private int maxAttempts;
@@ -35,9 +35,9 @@ class BookingVehicles {
 	@Value("${marketplace.vehicles.batch-size:20}")
 	private int batchSize;
 
-	BookingVehicles(VehicleLookupRepository repository, VehicleRegistryPort registry) {
+	BookingVehicles(VehicleLookupRepository repository, Vehicles vehicles) {
 		this.repository = repository;
-		this.registry = registry;
+		this.vehicles = vehicles;
 	}
 
 	@Scheduled(
@@ -76,7 +76,9 @@ class BookingVehicles {
 			return;
 		}
 
-		Optional<Vehicle> found = registry.lookup(plate.get());
+		// Through the cache (ADR 0016): a car the customer looked up while
+		// booking is not asked about a second time here.
+		Optional<Vehicle> found = vehicles.lookup(plate.get());
 
 		if (found.isEmpty()) {
 			repository.recordFailure(pending.bookingId(), "registry does not know " + plate.get().value());

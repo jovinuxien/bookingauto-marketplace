@@ -21,5 +21,7 @@
  * disabled adapter answers nothing, bookings carry the plate the customer
  * typed, and the day a vendor is picked it is one adapter and one property.
  */
-@org.springframework.modulith.ApplicationModule(displayName = "Vehicles")
+@org.springframework.modulith.ApplicationModule(
+	displayName = "Vehicles",
+	allowedDependencies = { "ratelimit" })
 package se.marketplace.vehicles;
