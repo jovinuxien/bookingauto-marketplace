@@ -73,6 +73,7 @@ class SecurityConfig {
 					// can read the token can read the booking directly.
 					new AntPathRequestMatcher("/api/bookings/lookup", HttpMethod.POST.name()),
 					new AntPathRequestMatcher("/api/bookings/cancel", HttpMethod.POST.name()),
+					new AntPathRequestMatcher("/api/bookings/review", HttpMethod.POST.name()),
 					new AntPathRequestMatcher("/api/signup/**", HttpMethod.POST.name())))
 
 			.authorizeHttpRequests(it -> it
@@ -131,6 +132,10 @@ class SecurityConfig {
 				// on its own.
 				.requestMatchers(HttpMethod.POST, "/api/bookings/lookup").permitAll()
 				.requestMatchers(HttpMethod.POST, "/api/bookings/cancel").permitAll()
+				// Rating a visit: the token in the body is the proof, as for cancel.
+				.requestMatchers(HttpMethod.POST, "/api/bookings/review").permitAll()
+				// A provider's reviews, for its page. Nothing in them is not meant to be read.
+				.requestMatchers(HttpMethod.GET, "/api/reviews/*").permitAll()
 
 				.requestMatchers("/api/auth/login").permitAll()
 

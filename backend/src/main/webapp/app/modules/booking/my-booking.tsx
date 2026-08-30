@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { useAppDispatch, useAppSelector } from 'app/config/store';
-import { cancelBooking, loadBooking } from 'app/shared/reducers/my-booking.reducer';
+import { cancelBooking, loadBooking, submitReview } from 'app/shared/reducers/my-booking.reducer';
 import { formatDay, formatPrice, formatTime } from 'app/shared/util/format';
 
 /**
@@ -18,9 +18,10 @@ const MyBooking = () => {
   const [params] = useSearchParams();
   const token = params.get('token');
 
-  const { loading, booking, error, cancelling, cancelError, justCancelled } = useAppSelector(
-    state => state.myBooking
-  );
+  const { loading, booking, error, cancelling, cancelError, justCancelled, reviewing, reviewError } =
+    useAppSelector(state => state.myBooking);
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
 
   /** The confirm step. A cancellation is irreversible and one click is not enough. */
   const [confirming, setConfirming] = useState(false);
@@ -108,6 +109,35 @@ const MyBooking = () => {
         </dl>
 
         {cancelError && <div className="alert alert-warning">{cancelError}</div>}
+
+        {/* After the visit. Anchored so the mail can land here. */}
+        {booking.reviewable && booking.reviewRating === null && (
+          <form id="omdome" className="card card-body mb-3"
+            onSubmit={event => { event.preventDefault(); if (token && rating > 0) dispatch(submitReview({ token, rating, comment })); }}>
+            <h2 className="h6">Hur var det?</h2>
+            <div className="mb-2" role="radiogroup" aria-label="Betyg">
+              {[1, 2, 3, 4, 5].map(n => (
+                <button key={n} type="button" role="radio" aria-checked={rating === n} aria-label={`${n} av 5`}
+                  className={`btn btn-sm ${n <= rating ? 'btn-warning' : 'btn-outline-secondary'} me-1`}
+                  onClick={() => setRating(n)}>★</button>
+              ))}
+            </div>
+            <textarea className="form-control mb-2" rows={2} maxLength={1000} placeholder="Några ord, om du vill"
+              value={comment} onChange={event => setComment(event.target.value)} aria-label="Kommentar" />
+            {reviewError && <div className="text-danger small mb-2">{reviewError}</div>}
+            <div>
+              <button className="btn btn-primary btn-sm" type="submit" disabled={rating === 0 || reviewing}>
+                {reviewing ? 'Sparar…' : 'Skicka omdöme'}
+              </button>
+              <span className="text-muted small ms-2">Visas med ditt förnamn och en initial.</span>
+            </div>
+          </form>
+        )}
+        {booking.reviewRating !== null && (
+          <p id="omdome" className="text-muted small">
+            Tack för ditt omdöme: <span aria-hidden="true">{'★'.repeat(booking.reviewRating)}</span> {booking.reviewRating} av 5.
+          </p>
+        )}
 
         {booking.cancellable && !confirming && (
           <>

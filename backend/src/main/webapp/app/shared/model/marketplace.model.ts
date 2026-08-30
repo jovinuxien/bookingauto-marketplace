@@ -18,6 +18,9 @@ export interface SearchHit {
   currency: string;
   freeSlots: number;
   firstFreeAt: string | null;
+  /** Null with no reviews — a new provider is not a bad one. */
+  ratingAverage: number | null;
+  ratingCount: number;
   /**
    * How old the index row behind this result is.
    *

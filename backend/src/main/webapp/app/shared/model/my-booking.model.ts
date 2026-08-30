@@ -18,6 +18,11 @@ export interface MyBooking {
   customerName: string;
   /** Null unless the service asked for one. */
   registrationNumber: string | null;
+  /** The appointment has happened: confirmed and past its end. A rating may be given. */
+  reviewable: boolean;
+  /** What this customer already said, or null. */
+  reviewRating: number | null;
+  reviewComment: string | null;
   /** Still in the future and not already cancelled. */
   cancellable: boolean;
   /** Cancelling right now would return the money. */

@@ -28,10 +28,13 @@ class PostgisSearch implements SearchPort {
 		       ST_Distance(p.location, ST_MakePoint(:lon, :lat)::geography)::int AS distance_m,
 		       s.name AS service_name, s.duration_minutes, s.price_minor, s.currency,
 		       a.free_slots, a.first_free_at,
-		       EXTRACT(EPOCH FROM (now() - a.computed_at))::bigint AS index_age_s
+		       EXTRACT(EPOCH FROM (now() - a.computed_at))::bigint AS index_age_s,
+		       r.average AS rating_average, COALESCE(r.n, 0) AS rating_count
 		  FROM availability_day a
 		  JOIN service  s ON s.id = a.service_id
 		  JOIN provider p ON p.id = a.provider_id
+		  LEFT JOIN (SELECT provider_id, avg(rating)::float8 AS average, count(*) AS n
+		               FROM review GROUP BY provider_id) r ON r.provider_id = p.id
 		 WHERE a.day = :day
 		   AND a.has_capacity
 		   AND s.active
@@ -90,7 +93,9 @@ class PostgisSearch implements SearchPort {
 		rs.getString("currency"),
 		rs.getInt("free_slots"),
 		toInstant(rs),
-		rs.getLong("index_age_s")
+		rs.getLong("index_age_s"),
+		(Double) rs.getObject("rating_average"),
+		rs.getInt("rating_count")
 	);
 
 	private static java.time.Instant toInstant(ResultSet rs) throws SQLException {

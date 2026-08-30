@@ -181,6 +181,24 @@ class OutboxNotifier implements Notifier {
 	}
 
 	@Override
+	public void reviewRequested(BookingNotice notice) {
+		enqueue(notice, "review_requested",
+			"Hur var det hos " + notice.providerName() + "?",
+			"""
+			Hej %s,
+
+			Du var hos %s %s. Hur blev det?
+
+			Ge ett betyg -- det tar tio sekunder och hjälper nästa kund att välja:
+			%s#omdome
+
+			Bara den som har varit där kan lämna ett omdöme, och det syns med
+			ditt förnamn och en initial.
+			""".formatted(notice.customerName(), notice.providerName(), format(notice),
+				notice.manageUrl()));
+	}
+
+	@Override
 	public void bookingNeedsAttention(BookingNotice notice) {
 		// Deliberately no "try again". This state means a compensation itself
 		// failed, so a second attempt could take a second payment.

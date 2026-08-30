@@ -61,13 +61,17 @@ class LandingRepository {
 			SELECT p.id, p.slug, p.name, p.city, p.address_line, p.description,
 			       min(s.price_minor) AS from_price_minor,
 			       max(s.currency)    AS currency,
-			       count(s.id)        AS service_count
+			       count(s.id)        AS service_count,
+			       r.average          AS rating_average,
+			       COALESCE(r.n, 0)   AS rating_count
 			  FROM provider p
 			  JOIN service s ON s.provider_id = p.id AND s.active
+			  LEFT JOIN (SELECT provider_id, avg(rating)::float8 AS average, count(*) AS n
+			               FROM review GROUP BY provider_id) r ON r.provider_id = p.id
 			 WHERE p.status = 'active'
 			   AND translate(lower(p.city), 'åäöüéè', 'aaouee') = lower(:city)
 			   AND (CAST(:category AS text) IS NULL OR s.category_slug = :category)
-			 GROUP BY p.id, p.slug, p.name, p.city, p.address_line, p.description
+			 GROUP BY p.id, p.slug, p.name, p.city, p.address_line, p.description, r.average, r.n
 			 ORDER BY p.name
 			""",
 			new MapSqlParameterSource().addValue("city", city).addValue("category", category),
@@ -75,7 +79,8 @@ class LandingRepository {
 				rs.getLong("id"), rs.getString("slug"), rs.getString("name"),
 				rs.getString("city"), Slugs.city(rs.getString("city")),
 				rs.getString("address_line"), rs.getString("description"),
-				rs.getInt("from_price_minor"), rs.getString("currency"), rs.getInt("service_count")));
+				rs.getInt("from_price_minor"), rs.getString("currency"), rs.getInt("service_count"),
+				(Double) rs.getObject("rating_average"), rs.getInt("rating_count")));
 	}
 
 	Optional<ProviderRow> provider(String slug) {
@@ -83,18 +88,22 @@ class LandingRepository {
 			SELECT p.id, p.slug, p.name, p.city, p.address_line, p.description,
 			       COALESCE(min(s.price_minor), 0) AS from_price_minor,
 			       COALESCE(max(s.currency), 'SEK') AS currency,
-			       count(s.id) AS service_count
+			       count(s.id) AS service_count,
+			       r.average AS rating_average, COALESCE(r.n, 0) AS rating_count
 			  FROM provider p
 			  LEFT JOIN service s ON s.provider_id = p.id AND s.active
+			  LEFT JOIN (SELECT provider_id, avg(rating)::float8 AS average, count(*) AS n
+			               FROM review GROUP BY provider_id) r ON r.provider_id = p.id
 			 WHERE p.slug = :slug AND p.status = 'active'
-			 GROUP BY p.id, p.slug, p.name, p.city, p.address_line, p.description
+			 GROUP BY p.id, p.slug, p.name, p.city, p.address_line, p.description, r.average, r.n
 			""",
 			new MapSqlParameterSource("slug", slug),
 			(ResultSet rs, int n) -> new ProviderRow(
 				rs.getLong("id"), rs.getString("slug"), rs.getString("name"),
 				rs.getString("city"), Slugs.city(rs.getString("city")),
 				rs.getString("address_line"), rs.getString("description"),
-				rs.getInt("from_price_minor"), rs.getString("currency"), rs.getInt("service_count")))
+				rs.getInt("from_price_minor"), rs.getString("currency"), rs.getInt("service_count"),
+				(Double) rs.getObject("rating_average"), rs.getInt("rating_count")))
 			.stream().findFirst();
 	}
 
@@ -123,8 +132,15 @@ class LandingRepository {
 
 	record ProviderRow(
 		long id, String slug, String name, String city, String citySlug, String addressLine,
-		String description, int fromPriceMinor, String currency, int serviceCount
-	) {}
+		String description, int fromPriceMinor, String currency, int serviceCount,
+		Double ratingAverage, int ratingCount
+	) {
+		/** "4,6" for the template; null with no reviews. */
+		public String ratingText() {
+			return ratingAverage == null ? null
+				: String.format(java.util.Locale.forLanguageTag("sv"), "%.1f", ratingAverage);
+		}
+	}
 
 	record ServiceRow(
 		long id, String name, String categorySlug, int durationMinutes, int priceMinor, String currency

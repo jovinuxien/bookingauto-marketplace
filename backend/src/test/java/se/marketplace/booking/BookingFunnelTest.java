@@ -698,6 +698,11 @@ class BookingFunnelTest {
 		}
 
 		@Override
+		public void reviewRequested(BookingNotice notice) {
+			// not exercised here
+		}
+
+		@Override
 		public void bookingNeedsAttention(BookingNotice notice) {
 			record("attention", notice);
 		}

@@ -81,6 +81,11 @@
                    th:text="${provider.description}"></p>
               </div>
               <div class="text-end">
+                <div class="small" th:if="${provider.ratingAverage != null}">
+                  <span aria-hidden="true">★</span>
+                  <span th:text="${provider.ratingText()}">4,6</span>
+                  <span class="text-muted" th:text="'(' + ${provider.ratingCount} + ')'">(12)</span>
+                </div>
                 <div class="small text-muted" th:text="${provider.serviceCount} + ' tjänster'"></div>
                 <div class="fw-semibold"
                      th:text="'Från ' + ${#numbers.formatInteger(provider.fromPriceMinor / 100, 0)} + ' ' + ${provider.currency}">

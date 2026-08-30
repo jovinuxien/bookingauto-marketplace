@@ -319,13 +319,15 @@ db/015                 cykel, and generic words belong to nobody
 db/016                 the tyre dimension, front and rear -- why TIC was chosen
 db/017                 a car is asked about once, and remembered (ADR 0016)
 db/018                 a service has a list price and zero or more rules
+db/019                 what the customer thought, once they have been
 backend/               Spring Modulith: search, sync, booking, payments,
                        onboarding, console, signup, landing, notifications, geo,
                        ai (whether a model may be called; no agents live there),
                        ratelimit (a bucket, a window and a count),
                        categories (what a salon sells, and its URL),
                        vehicles (which car is coming; TIC behind a port, off until keyed),
-                       pricing (what a service costs for a particular car)
+                       pricing (what a service costs for a particular car),
+                       reviews (what customers thought; one per visit that happened)
   src/main/webapp/app/ React SPA — config/, shared/, modules/; built into the jar
 ```
 

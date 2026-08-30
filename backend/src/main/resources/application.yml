@@ -222,6 +222,16 @@ marketplace:
     lookups-per-ip-per-hour: ${MARKETPLACE_VEHICLES_LOOKUPS_PER_IP_PER_HOUR:30}
     retry-after-seconds: ${MARKETPLACE_VEHICLES_RETRY_AFTER_SECONDS:60}
 
+  reviews:
+    # "Hur var det?" goes out this long after the appointment ended -- not
+    # at once, since someone still in the chair cannot rate the cut -- and
+    # never for a visit older than this many days, which would be spam
+    # about something they have forgotten.
+    ask-after-hours: ${MARKETPLACE_REVIEWS_ASK_AFTER_HOURS:2}
+    ask-within-days: ${MARKETPLACE_REVIEWS_ASK_WITHIN_DAYS:14}
+    batch-size: ${MARKETPLACE_REVIEWS_BATCH_SIZE:50}
+    interval-ms: ${MARKETPLACE_REVIEWS_INTERVAL_MS:600000}
+
   geocoding:
     # 'none' by default, and that is not laziness. Enabling a geocoder by
     # default would point every developer machine and every CI run at a public

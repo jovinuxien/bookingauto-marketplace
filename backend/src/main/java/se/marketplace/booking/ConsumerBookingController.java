@@ -34,8 +34,24 @@ class ConsumerBookingController {
 
 	private final BookingCancellation cancellation;
 
-	ConsumerBookingController(BookingCancellation cancellation) {
+	private final BookingReviews reviews;
+
+	ConsumerBookingController(BookingCancellation cancellation, BookingReviews reviews) {
 		this.cancellation = cancellation;
+		this.reviews = reviews;
+	}
+
+	@PostMapping("/review")
+	ResponseEntity<?> review(@RequestBody ReviewRequest request, HttpServletRequest http) {
+		return switch (reviews.submit(request.token(), request.rating(), request.comment(), clientIp(http))) {
+			case BookingReviews.Saved saved -> ResponseEntity.ok(saved);
+			// 409 for both: the page already knows which, from the booking it shows.
+			case BookingReviews.AlreadyReviewed ignored -> ResponseEntity.status(HttpStatus.CONFLICT).build();
+			case BookingReviews.NotYet ignored -> ResponseEntity.status(HttpStatus.CONFLICT).build();
+			case BookingReviews.Invalid invalid -> ResponseEntity.badRequest().body(invalid.message());
+			case BookingReviews.Unknown ignored -> ResponseEntity.notFound().build();
+			case BookingReviews.Throttled ignored -> ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
+		};
 	}
 
 	@PostMapping("/lookup")
@@ -96,5 +112,7 @@ class ConsumerBookingController {
 	}
 
 	record TokenRequest(String token) {}
+
+	record ReviewRequest(String token, int rating, String comment) {}
 
 }

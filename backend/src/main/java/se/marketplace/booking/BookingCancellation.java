@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import se.marketplace.notifications.Notifier;
 import se.marketplace.payments.PaymentPort;
 import se.marketplace.ratelimit.RateLimiter;
+import se.marketplace.reviews.Review;
+import se.marketplace.reviews.Reviews;
 import se.marketplace.sync.CalBookingPort;
 
 /**
@@ -66,6 +68,7 @@ public class BookingCancellation {
 	private final PaymentPort payments;
 	private final Notifier notifier;
 	private final RateLimiter limiter;
+	private final Reviews reviews;
 
 	/**
 	 * Lookups per hour from one address.
@@ -79,8 +82,9 @@ public class BookingCancellation {
 	private int lookupPerIpPerHour;
 
 	BookingCancellation(BookingRepository repository, BookingLinks links, CalBookingPort cal,
-		PaymentPort payments, Notifier notifier, RateLimiter limiter) {
+		PaymentPort payments, Notifier notifier, RateLimiter limiter, Reviews reviews) {
 
+		this.reviews = reviews;
 		this.repository = repository;
 		this.links = links;
 		this.cal = cal;
@@ -254,6 +258,7 @@ public class BookingCancellation {
 	private ConsumerView view(BookingRepository.ConsumerBooking booking, Instant now) {
 		boolean confirmed = booking.confirmed();
 
+		Optional<Review> review = confirmed ? reviews.forBooking(booking.id()) : Optional.empty();
 		return new ConsumerView(
 			booking.providerName(),
 			booking.city(),
@@ -269,7 +274,10 @@ public class BookingCancellation {
 			freeUntil(booking),
 			booking.cancellationCutoffHours(),
 			booking.needsAttention(),
-			booking.registrationNumber());
+			booking.registrationNumber(),
+			confirmed && !now.isBefore(booking.endsAt()),
+			review.map(Review::rating).orElse(null),
+			review.map(Review::comment).orElse(null));
 	}
 
 	/** The row as it now reads, without going back to the database to find out. */
@@ -310,7 +318,12 @@ public class BookingCancellation {
 		int cutoffHours,
 		boolean needsAttention,
 		/** Null unless the service asked for one. */
-		String registrationNumber
+		String registrationNumber,
+		/** The appointment has happened: confirmed and past its end. A rating may be given. */
+		boolean reviewable,
+		/** What this customer already said, or null. */
+		Integer reviewRating,
+		String reviewComment
 	) {}
 
 	public sealed interface Result {}

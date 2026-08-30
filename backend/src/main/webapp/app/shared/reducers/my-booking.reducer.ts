@@ -19,6 +19,9 @@ interface MyBookingState {
   cancelling: boolean;
   /** Why the cancellation did not happen. The booking is still on screen. */
   cancelError: string | null;
+  reviewing: boolean;
+  /** Why the rating was not saved. */
+  reviewError: string | null;
   /** True for the one render after a successful cancellation. */
   justCancelled: boolean;
 }
@@ -29,6 +32,8 @@ const initialState: MyBookingState = {
   error: null,
   cancelling: false,
   cancelError: null,
+  reviewing: false,
+  reviewError: null,
   justCancelled: false,
 };
 
@@ -49,6 +54,19 @@ interface CancelFailure {
   booking?: MyBooking;
   message: string;
 }
+
+export const submitReview = createAsyncThunk<
+  { rating: number },
+  { token: string; rating: number; comment: string },
+  { rejectValue: ApiError }
+>('myBooking/review', async (request, { rejectWithValue }) => {
+  try {
+    const response = await axios.post<{ rating: number }>('/bookings/review', request);
+    return response.data;
+  } catch (error) {
+    return rejectWithValue(error as ApiError);
+  }
+});
 
 export const cancelBooking = createAsyncThunk<MyBooking, string, { rejectValue: CancelFailure }>(
   'myBooking/cancel',
@@ -116,6 +134,24 @@ const myBookingSlice = createSlice({
         state.cancelling = false;
         state.booking = action.payload;
         state.justCancelled = true;
+      })
+      .addCase(submitReview.pending, state => {
+        state.reviewing = true;
+        state.reviewError = null;
+      })
+      .addCase(submitReview.fulfilled, (state, action) => {
+        state.reviewing = false;
+        if (state.booking) {
+          state.booking.reviewRating = action.payload.rating;
+        }
+      })
+      .addCase(submitReview.rejected, (state, action) => {
+        state.reviewing = false;
+        const status = action.payload?.status;
+        state.reviewError =
+          status === 409 ? 'Den här tiden har redan fått ett omdöme.' :
+          status === 400 && typeof action.payload?.data === 'string' ? action.payload.data :
+          'Omdömet kunde inte sparas. Prova igen om en stund.';
       })
       .addCase(cancelBooking.rejected, (state, action) => {
         state.cancelling = false;

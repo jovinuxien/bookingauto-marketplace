@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import axios from 'app/config/axiosinstance';
 import type { CategoryChoice } from 'app/shared/model/signup.model';
 import { RegnrBox } from 'app/modules/vehicles/regnr-box';
+import { Stars } from 'app/shared/components/stars';
 
 import { useAppDispatch, useAppSelector } from 'app/config/store';
 import { askSearch, interpretationDropped, runSearch } from 'app/shared/reducers/search.reducer';
@@ -246,6 +247,7 @@ const ResultCard = ({ hit, regnr }: { hit: SearchHit; regnr?: string }) => (
           </h2>
           <div className="small text-muted">
             {hit.city} · {formatDistance(hit.distanceMetres)}
+            {hit.ratingCount > 0 && <> · <Stars average={hit.ratingAverage} count={hit.ratingCount} small /></>}
           </div>
           <div className="mt-2">
             {hit.serviceName} · {hit.durationMinutes} min ·{' '}

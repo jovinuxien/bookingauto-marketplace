@@ -70,6 +70,9 @@ public interface Notifier {
 	 */
 	void bookingNeedsAttention(BookingNotice notice);
 
+	/** "Hur var det?" — sent once, a while after the appointment, with the link to rate it. */
+	void reviewRequested(BookingNotice notice);
+
 	/**
 	 * @param providerId nullable: an attempt can fail before it is tied to a
 	 *        salon, and a message that cannot be sent because a foreign key is

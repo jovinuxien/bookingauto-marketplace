@@ -45,7 +45,10 @@ public interface SearchPort {
 		 * entitled to know it is looking at an approximation, and it is what
 		 * makes staleness measurable instead of mysterious.
 		 */
-		long indexAgeSeconds
+		long indexAgeSeconds,
+		/** Null with no reviews — a new provider is not a bad one. */
+		Double ratingAverage,
+		int ratingCount
 	) {}
 
 }

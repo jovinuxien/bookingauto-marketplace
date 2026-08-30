@@ -70,7 +70,7 @@ class BookingCancellationTest {
 		ReflectionTestUtils.setField(links, "publicUrl", "https://boka.example.se");
 
 		cancellation = new BookingCancellation(repository, links, cal, payments, notifier,
-			new PermissiveLimiter());
+			new PermissiveLimiter(), org.mockito.Mockito.mock(se.marketplace.reviews.Reviews.class));
 		ReflectionTestUtils.setField(cancellation, "lookupPerIpPerHour", 120);
 	}
 
@@ -313,7 +313,8 @@ class BookingCancellationTest {
 	void throttled() {
 		given(booking(Duration.ofDays(7)));
 		cancellation = new BookingCancellation(repository, links, cal, payments, notifier,
-			new RefusingLimiter());
+			new RefusingLimiter(),
+			org.mockito.Mockito.mock(se.marketplace.reviews.Reviews.class));
 		ReflectionTestUtils.setField(cancellation, "lookupPerIpPerHour", 120);
 
 		assertThat(cancellation.lookup(token(), IP)).isInstanceOf(BookingCancellation.Throttled.class);
@@ -506,6 +507,11 @@ class BookingCancellationTest {
 
 		@Override
 		public void bookingRefunded(BookingNotice notice, String reason) {
+		}
+
+		@Override
+		public void reviewRequested(BookingNotice notice) {
+			// not exercised here
 		}
 
 		@Override

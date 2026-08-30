@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { RegnrBox } from 'app/modules/vehicles/regnr-box';
+import { Stars } from 'app/shared/components/stars';
+import axios from 'app/config/axiosinstance';
+import type { ProviderReviews } from 'app/shared/model/review.model';
 
 import { useAppDispatch, useAppSelector } from 'app/config/store';
 import { loadProvider, loadSlots } from 'app/shared/reducers/provider.reducer';
@@ -27,10 +30,14 @@ const ProviderPage = () => {
   // Carried from the search page, or typed here; carried on to checkout.
   const regnr = params.get('regnr') ?? undefined;
   const [serviceId, setServiceId] = useState<number | null>(null);
+  // Fetched beside the provider, not inside it: reviews change on their own
+  // schedule and belong to their own module.
+  const [reviews, setReviews] = useState<ProviderReviews | null>(null);
 
   useEffect(() => {
     if (slug) {
       dispatch(loadProvider(slug));
+      axios.get<ProviderReviews>(`/reviews/${slug}`).then(r => setReviews(r.data), () => setReviews(null));
     }
   }, [dispatch, slug]);
 
@@ -79,6 +86,9 @@ const ProviderPage = () => {
         {provider.addressLine ? `${provider.addressLine}, ` : ''}
         {provider.city}
       </p>
+      {reviews && reviews.summary.count > 0 && (
+        <p className="mb-2"><Stars average={reviews.summary.average} count={reviews.summary.count} /></p>
+      )}
       {provider.description && <p>{provider.description}</p>}
 
       <h2 className="h6 mt-4">Tjänster</h2>
@@ -145,8 +155,34 @@ const ProviderPage = () => {
           ))}
         </div>
       )}
+
+      <RecentReviews reviews={reviews} />
     </>
   );
 };
 
 export default ProviderPage;
+
+/** What the last few customers said. Below the times: people book first and read second. */
+export const RecentReviews = ({ reviews }: { reviews: ProviderReviews | null }) => {
+  if (!reviews || reviews.recent.length === 0) {
+    return null;
+  }
+  return (
+    <>
+      <h2 className="h6 mt-5">Omdömen</h2>
+      <ul className="list-unstyled">
+        {reviews.recent.map(review => (
+          <li key={review.bookingId} className="border-bottom py-2">
+            <div className="small">
+              <span aria-hidden="true">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</span>
+              <span className="visually-hidden">{review.rating} av 5</span>
+              <span className="text-muted"> · {review.author} · {formatDay(review.createdAt)}</span>
+            </div>
+            {review.comment && <p className="mb-0">{review.comment}</p>}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+};

@@ -23,7 +23,8 @@ Last revised: 2026-08-30.
 | 1.10 | **SEO landing pages** per category × city (`/frisor/stockholm`, `/dackbyte/malmo` …) with JSON-LD `ItemList` (`HealthAndBeautyBusiness` or `AutoRepair`), canonical, sitemap, robots; only pages with providers exist | `landing`, `/sitemap.xml`, `/robots.txt` |
 | 1.11 | **Seasonal tyre notice** on `/dackbyte/{city}` with the legal deadline (1 Dec / 15 Apr) chosen by today's date | `TyreSeason` |
 | 1.12 | City index page `/orter` | `landing` |
-| 1.13 | Rate limits on every public write (bookings, lookup, cancel, signup, login) | `ratelimit` |
+| 1.13 | Rate limits on every public write (bookings, lookup, cancel, review, signup, login) | `ratelimit` |
+| 1.14 | **Reviews**: two hours after a visit the customer is mailed "Hur var det?" with their booking link; one 1–5 rating (+ optional comment) per booking that actually happened — confirmed and past its end, never cancelled; shown as "Anna A."; average and count on every search hit, landing card and provider page, with the last ten comments | `reviews` module, `POST /api/bookings/review`, `GET /api/reviews/{slug}`, db/019 |
 
 ## 2. Categories (the taxonomy)
 
@@ -76,6 +77,6 @@ Last revised: 2026-08-30.
 
 ## Not built (so nobody assumes it)
 
-Reviews/ratings · add-on services ·
+Add-on services ·
 reschedule · provider-initiated cancellation · workshop widget · messaging ·
 provider subscription tiers · mobile app · consumer accounts (by design, ADR 0014).

@@ -382,6 +382,32 @@ class BookingRepository {
 			new MapSqlParameterSource("id", providerId), String.class);
 	}
 
+	/**
+	 * Appointments that happened and have not been asked about: confirmed,
+	 * ended between {@code afterHours} ago and {@code withinDays} ago.
+	 */
+	List<ConsumerBooking> needingReviewRequest(int afterHours, int withinDays, int limit) {
+		List<Long> ids = jdbc.query("""
+			SELECT id FROM booking
+			 WHERE status = 'confirmed'
+			   AND review_requested_at IS NULL
+			   AND ends_at < now() - make_interval(hours => :hours)
+			   AND ends_at > now() - make_interval(days => :days)
+			 ORDER BY ends_at
+			 LIMIT :limit
+			""",
+			new MapSqlParameterSource().addValue("hours", afterHours)
+				.addValue("days", withinDays).addValue("limit", limit),
+			(rs, n) -> rs.getLong("id"));
+		return ids.stream().flatMap(id -> findBookingForCustomer(id).stream()).toList();
+	}
+
+	int markReviewRequested(long bookingId) {
+		return jdbc.update(
+			"UPDATE booking SET review_requested_at = now() WHERE id = :id AND review_requested_at IS NULL",
+			new MapSqlParameterSource("id", bookingId));
+	}
+
 	/** contact_email, not email -- see findBookingForCustomer for why. */
 	String providerEmail(long providerId) {
 		return jdbc.queryForObject(
