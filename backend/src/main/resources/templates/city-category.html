@@ -26,7 +26,7 @@
               "@type": "ListItem",
               "position": [[${iter.index + 1}]],
               "item": {
-                "@type": "HealthAndBeautyBusiness",
+                "@type": [[${schemaType}]],
                 "name": [[${provider.name}]],
                 "url": [[${'/salong/' + provider.slug}]],
                 "address": {
@@ -53,6 +53,17 @@
 
       <h1 class="h3" th:text="${category.label} + ' i ' + ${cityName}">Frisörer i Stockholm</h1>
       <p class="text-muted" th:text="${description}">Jämför och boka.</p>
+
+      <!--
+        Only on /dackbyte. The legal dates are why this page exists (ADR 0015),
+        and the notice changes with the calendar so the page is never telling
+        someone in June to hurry for December.
+      -->
+      <div class="alert alert-info" role="note" th:if="${season}">
+        <strong th:text="${season.heading}">Dags för vinterdäck</strong>
+        <span th:text="' — ' + ${season.deadlineText}"></span>
+        <div class="small mt-1" th:text="${season.body}"></div>
+      </div>
 
       <div class="row g-3 mt-2">
         <div class="col-12" th:each="provider : ${providers}">

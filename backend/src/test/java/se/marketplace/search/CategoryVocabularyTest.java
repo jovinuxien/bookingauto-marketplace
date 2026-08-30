@@ -21,8 +21,8 @@ import se.marketplace.categories.Category;
 class CategoryVocabularyTest {
 
 	private static final CategoryVocabulary VOCABULARY = new CategoryVocabulary(List.of(
-		new Category("har", "frisor", "Frisörer", List.of("klippning", "balayage"), 10),
-		new Category("massage", "massage", "Massage", List.of("ryggmassage"), 20)));
+		new Category("har", "frisor", "Frisörer", List.of("klippning", "balayage"), 10, false),
+		new Category("massage", "massage", "Massage", List.of("ryggmassage"), 20, false)));
 
 	@Test
 	@DisplayName("the slug leads, because the slug is what has to come back")
@@ -40,7 +40,7 @@ class CategoryVocabularyTest {
 	@DisplayName("a category with no synonyms is still a category")
 	void synonymsAreOptional() {
 		var bare = new CategoryVocabulary(List.of(
-			new Category("hud", "hudvard", "Hudvård", List.of(), 30)));
+			new Category("hud", "hudvard", "Hudvård", List.of(), 30, false)));
 
 		// No trailing "()" — an empty bracket reads as a list the model failed
 		// to be given rather than one that is simply empty.

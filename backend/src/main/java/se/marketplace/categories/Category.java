@@ -28,7 +28,14 @@ public record Category(
 	 */
 	List<String> synonyms,
 
-	int sortOrder
+	int sortOrder,
+
+	/**
+	 * The customer is bringing a car. Set by db/013 for the bil & däck
+	 * categories; what checkout, the landing page and the booking funnel key
+	 * off, so that none of them holds its own list of which slugs are cars.
+	 */
+	boolean vehicle
 ) {
 
 	/**

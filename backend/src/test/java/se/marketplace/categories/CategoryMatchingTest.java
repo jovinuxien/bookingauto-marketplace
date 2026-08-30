@@ -37,7 +37,7 @@ class CategoryMatchingTest {
 	 */
 	private static Category category(String slug, String path, String label, String... synonyms) {
 		return new Category(slug, path, label,
-			java.util.Arrays.stream(synonyms).map(Categories::fold).toList(), 10);
+			java.util.Arrays.stream(synonyms).map(Categories::fold).toList(), 10, false);
 	}
 
 	private static final List<Category> ALL = List.of(HAR, MASSAGE, HUD);

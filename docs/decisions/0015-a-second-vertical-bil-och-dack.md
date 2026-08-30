@@ -91,9 +91,13 @@ what comes later without renumbering.
   configured `har`. Without it a workshop whose event types match nothing
   became a hairdresser, which is the one thing that had to be wrong before
   any workshop could onboard.
-- **Seasonal copy.** `/dackbyte/stockholm` should say the dates. The label
-  column holds a name, not a paragraph, and where seasonal copy lives is a
-  landing-page question.
+- **Seasonal copy** — deferred here, then done: `TyreSeason` in `landing`
+  turns today's date into one of four notices (autumn window, winter,
+  spring window, summer) with the legal deadline, shown only on
+  `/dackbyte/{city}`. The same change types vehicle listings as
+  `AutoRepair` in the page's JSON-LD and counts "verkstäder" rather than
+  "salonger" — a `vehicle` flag on `Category`, read from `db/013`'s
+  `asks_vehicle`, so no page holds its own list of which slugs are cars.
 - **Cykel.** Bokamera lists bike repair and it is the same shape. It is left
   out because its natural synonyms — "punktering", "service" — collide with
   the vehicle ones, and a bicycle shop's "Punktering" landing in `dack` is

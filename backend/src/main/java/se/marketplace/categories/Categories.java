@@ -29,7 +29,7 @@ import org.springframework.stereotype.Component;
 public class Categories {
 
 	private static final String ACTIVE = """
-		SELECT slug, path, label, synonyms, sort_order
+		SELECT slug, path, label, synonyms, sort_order, asks_vehicle
 		  FROM service_category
 		 WHERE active
 		 ORDER BY sort_order, slug
@@ -112,7 +112,8 @@ public class Categories {
 		rs.getString("path"),
 		rs.getString("label"),
 		synonyms(rs),
-		rs.getInt("sort_order"));
+		rs.getInt("sort_order"),
+		rs.getBoolean("asks_vehicle"));
 
 	/**
 	 * Folded on the way out, so the table stays readable by a person.

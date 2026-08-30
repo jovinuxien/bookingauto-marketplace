@@ -1,5 +1,7 @@
 package se.marketplace.landing;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -42,6 +44,8 @@ class LandingController {
 	 * migration and a word here. Getting half of it done is now noticed at boot
 	 * rather than by a 404 nobody is watching.
 	 */
+	private static final ZoneId STOCKHOLM = ZoneId.of("Europe/Stockholm");
+
 	static final String CATEGORY_PATHS = "frisor|massage|hudvard|dackbyte|bilservice|bilvard|bilglas";
 
 	private final LandingRepository repository;
@@ -107,6 +111,15 @@ class LandingController {
 		model.addAttribute("providers", providers);
 		model.addAttribute("cityName", cityName);
 		model.addAttribute("category", resolved);
+		// What kind of place is listed. A workshop is not a HealthAndBeautyBusiness
+		// however it is filed, and the structured data is the part a search
+		// engine believes.
+		model.addAttribute("schemaType", resolved.vehicle() ? "AutoRepair" : "HealthAndBeautyBusiness");
+		String noun = resolved.vehicle() ? "verkstäder" : "salonger";
+		// The calendar, on the one page where it is the reason people came.
+		if ("dack".equals(resolved.slug())) {
+			model.addAttribute("season", TyreSeason.on(LocalDate.now(STOCKHOLM)));
+		}
 		// path(), not slug(). The slug is the category's value in the database
 		// ("har"); the path is its URL ("frisor"). Using the wrong one pointed
 		// every canonical at a URL that 404s, which tells a search engine the
@@ -116,7 +129,7 @@ class LandingController {
 		model.addAttribute("title", resolved.label() + " i " + cityName + " — boka tid online");
 		model.addAttribute("description",
 			"Jämför " + resolved.label().toLowerCase() + " i " + cityName
-				+ " och boka en ledig tid direkt. " + providers.size() + " salonger.");
+				+ " och boka en ledig tid direkt. " + providers.size() + " " + noun + ".");
 		return "city-category";
 	}
 
