@@ -23,8 +23,12 @@ class OnboardingController {
 
 	private final ProviderOnboarding onboarding;
 
-	OnboardingController(ProviderOnboarding onboarding) {
+	private final se.marketplace.pricing.Plans plans;
+
+	OnboardingController(ProviderOnboarding onboarding,
+		se.marketplace.pricing.Plans plans) {
 		this.onboarding = onboarding;
+		this.plans = plans;
 	}
 
 	@PostMapping
@@ -49,6 +53,23 @@ class OnboardingController {
 	ResponseEntity<String> kycLink(@PathVariable long id) {
 		return ResponseEntity.ok(onboarding.onboardingLink(id));
 	}
+
+	/**
+	 * The plan, set by an operator after the conversation that ends with a
+	 * payment arrangement (ADR 0020). Applies to new quotes only; every
+	 * frozen attempt keeps the rate it was sold at.
+	 */
+	@org.springframework.web.bind.annotation.PutMapping("/{id}/plan")
+	ResponseEntity<?> setPlan(@PathVariable long id, @RequestBody PlanRequest request) {
+		if (!plans.knows(request.plan())) {
+			return ResponseEntity.badRequest().body("okänt paket: " + request.plan());
+		}
+		return onboarding.setPlan(id, request.plan().toLowerCase(java.util.Locale.ROOT))
+			? ResponseEntity.noContent().build()
+			: ResponseEntity.notFound().build();
+	}
+
+	record PlanRequest(String plan) {}
 
 	@PostMapping("/{id}/import-services")
 	ResponseEntity<ProviderOnboarding.ImportResult> importServices(@PathVariable long id) {

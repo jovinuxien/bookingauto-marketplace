@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import Pricing from 'app/modules/console/pricing';
 import ConsoleThread from 'app/modules/console/thread';
+import PlanCard from 'app/modules/console/plan';
 
 import { useAppDispatch, useAppSelector } from 'app/config/store';
 import { cancelAsProvider, loadConsole } from 'app/shared/reducers/console.reducer';
@@ -124,6 +125,8 @@ const Console = () => {
           </table>
         </div>
       )}
+
+      <PlanCard />
 
       {summary && (
         <>

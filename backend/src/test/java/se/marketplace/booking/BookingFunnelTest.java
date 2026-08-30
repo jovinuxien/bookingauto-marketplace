@@ -25,6 +25,7 @@ import se.marketplace.booking.BookingRepository.ServiceForSale;
 import se.marketplace.notifications.Notifier;
 import se.marketplace.pricing.Addon;
 import se.marketplace.pricing.Addons;
+import se.marketplace.pricing.Plans;
 import se.marketplace.pricing.PriceRules;
 import se.marketplace.pricing.Quote;
 import se.marketplace.vehicles.RegistrationNumber;
@@ -57,6 +58,7 @@ class BookingFunnelTest {
 	private PriceRules priceRules;
 	private Vehicles vehicles;
 	private Addons addons;
+	private Plans plans;
 	private BookingFunnel funnel;
 
 	@BeforeEach
@@ -74,13 +76,14 @@ class BookingFunnelTest {
 		priceRules = mock(PriceRules.class);
 		vehicles = mock(Vehicles.class);
 		addons = mock(Addons.class);
+		plans = mock(Plans.class);
+		when(plans.of(any())).thenReturn(new Plans.Plan("bas", "Bas", 0, 1500));
 		when(addons.priced(anyLong(), any())).thenReturn(List.of());
 		// List price unless a test says otherwise: the matcher has its own tests.
 		when(priceRules.quote(anyLong(), anyInt(), any())).thenAnswer(call -> Quote.list(call.getArgument(1)));
 
 		funnel = new BookingFunnel(repository, cal, payments,
-			serviceId -> refreshed.add(serviceId), notifier, links, priceRules, vehicles, addons);
-		ReflectionTestUtils.setField(funnel, "commissionBps", 1500);
+			serviceId -> refreshed.add(serviceId), notifier, links, priceRules, vehicles, addons, plans);
 		ReflectionTestUtils.setField(funnel, "timeZone", "Europe/Stockholm");
 		ReflectionTestUtils.setField(funnel, "cancellationCutoffHours", 24);
 	}
@@ -214,6 +217,17 @@ class BookingFunnelTest {
 		bookWithPlate("ABC123");
 
 		assertThat(repository.started.registrationNumber()).isNull();
+	}
+
+	@Test
+	@DisplayName("the commission rate is the provider's plan's, frozen at quote time")
+	void planDecidesTheRate() {
+		when(plans.of("bas")).thenReturn(new Plans.Plan("pro", "Pro", 49900, 900));
+
+		book();
+
+		// 9% of 60 000, because that is what this provider's plan says today.
+		assertThat(repository.started.commissionMinor()).isEqualTo(5400);
 	}
 
 	@Test
@@ -583,7 +597,7 @@ class BookingFunnelTest {
 		@Override
 		Optional<ServiceForSale> findServiceForSale(long serviceId) {
 			return Optional.of(new ServiceForSale(
-				1L, 1L, 1L, 60000, "SEK", 45, true, true, "acct_test", true, asksVehicle));
+				1L, 1L, 1L, 60000, "SEK", 45, true, true, "bas", "acct_test", true, asksVehicle));
 		}
 
 		@Override

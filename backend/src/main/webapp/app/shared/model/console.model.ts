@@ -8,6 +8,8 @@ export interface Session {
 export interface ConsoleSummary {
   name: string;
   slug: string;
+  /** 'bas' | 'plus' | 'pro' — decides the commission, nothing else (ADR 0020). */
+  plan: string;
   status: string;
   onboardingState: string;
   payoutsEnabled: boolean;
@@ -79,6 +81,19 @@ export interface ConsoleQuote {
   tyres: string | null;
   registryUnavailable: boolean;
   quote: { priceMinor: number; label: string | null; forVehicle: boolean };
+}
+
+/** The price list and where this provider sits on it (ADR 0020). */
+export interface PlanView {
+  current: Plan;
+  all: Plan[];
+}
+
+export interface Plan {
+  name: string;
+  label: string;
+  monthlyMinor: number;
+  commissionBps: number;
 }
 
 /** An attempt no machine could finish. */

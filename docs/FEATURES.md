@@ -83,4 +83,4 @@ Last revised: 2026-08-30.
 ## Not built (so nobody assumes it)
 
 
-Provider subscription tiers · mobile app · consumer accounts (by design, ADR 0014).
+Mobile app · consumer accounts (by design, ADR 0014) · monthly-fee collection for plans (invoiced by a person, ADR 0020).

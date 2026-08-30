@@ -13,5 +13,5 @@
  */
 @org.springframework.modulith.ApplicationModule(
 	displayName = "Onboarding",
-	allowedDependencies = { "sync", "payments", "categories" })
+	allowedDependencies = { "sync", "payments", "categories", "pricing" })
 package se.marketplace.onboarding;

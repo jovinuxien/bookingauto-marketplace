@@ -181,6 +181,11 @@ public class ProviderOnboarding {
 		return connect.onboardingLink(provider.stripeAccountId(), returnUrl, refreshUrl);
 	}
 
+	/** True when the provider exists. The plan applies to new quotes only. */
+	public boolean setPlan(long providerId, String plan) {
+		return repository.setPlan(providerId, plan) > 0;
+	}
+
 	/**
 	 * Step 3. Imports what the salon set up in Cal.
 	 *

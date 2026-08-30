@@ -50,6 +50,11 @@ class OnboardingRepository {
 		return keys.getKey().longValue();
 	}
 
+	int setPlan(long providerId, String plan) {
+		return jdbc.update("UPDATE provider SET plan = :plan, updated_at = now() WHERE id = :id",
+			new MapSqlParameterSource().addValue("id", providerId).addValue("plan", plan));
+	}
+
 	Optional<Provider> find(long id) {
 		return jdbc.query("SELECT * FROM provider WHERE id = :id",
 			new MapSqlParameterSource("id", id), PROVIDER).stream().findFirst();

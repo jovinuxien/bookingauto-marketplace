@@ -219,7 +219,7 @@ class BookingRescheduleTest {
 		@Override
 		Optional<ServiceForSale> findServiceForSale(long serviceId) {
 			return Optional.of(new ServiceForSale(3L, 7L, 3L, 60000, "SEK", 45,
-				true, true, "acct_test", true, false));
+				true, true, "bas", "acct_test", true, false));
 		}
 
 	}

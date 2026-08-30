@@ -55,9 +55,21 @@ marketplace:
   # be clicked, which is the kind of failure nothing in the system can detect.
   public-url: ${MARKETPLACE_PUBLIC_URL:http://localhost:8090}
 
-  # Basis points, frozen onto each attempt at quote time so a rate change
-  # cannot retroactively alter a sale already in flight.
-  commission-bps: 1500
+  # The price list (ADR 0020). PLACEHOLDER NUMBERS: shaped like the
+  # market's ladder, decided by nobody -- real ones need real unit
+  # economics and belong to whoever owns the P&L. The commission is read
+  # per provider plan at quote time and frozen onto the attempt, so a
+  # change here never rewrites a sale in flight. Monthly fees are invoiced
+  # by a person; nothing here collects them.
+  plans:
+    bas:
+      commission-bps: ${MARKETPLACE_PLANS_BAS_BPS:1500}
+    plus:
+      commission-bps: ${MARKETPLACE_PLANS_PLUS_BPS:1200}
+      monthly-minor: ${MARKETPLACE_PLANS_PLUS_MONTHLY:24900}
+    pro:
+      commission-bps: ${MARKETPLACE_PLANS_PRO_BPS:900}
+      monthly-minor: ${MARKETPLACE_PLANS_PRO_MONTHLY:49900}
 
   payments:
     # 'dev' moves no money. Never set this anywhere real.

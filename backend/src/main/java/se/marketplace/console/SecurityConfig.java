@@ -188,6 +188,8 @@ class SecurityConfig {
 				// immediately, with no verification in front of it, which is
 				// exactly why the public path is /api/signup and not this.
 				.requestMatchers(HttpMethod.POST, "/api/providers").hasRole("PLATFORM_ADMIN")
+				// The plan decides the commission; only an operator moves it.
+				.requestMatchers(HttpMethod.PUT, "/api/providers/*/plan").hasRole("PLATFORM_ADMIN")
 
 				// --- placing a salon on the map ---------------------------------
 				// Operator-only for the same reason onboarding is: where a salon sits

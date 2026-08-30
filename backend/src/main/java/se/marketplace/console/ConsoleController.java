@@ -27,12 +27,16 @@ class ConsoleController {
 	private final se.marketplace.booking.ProviderCancellation cancellation;
 	private final se.marketplace.booking.BookingMessages messages;
 
+	private final se.marketplace.pricing.Plans plans;
+
 	ConsoleController(ConsoleRepository repository,
 		se.marketplace.booking.ProviderCancellation cancellation,
-		se.marketplace.booking.BookingMessages messages) {
+		se.marketplace.booking.BookingMessages messages,
+		se.marketplace.pricing.Plans plans) {
 		this.repository = repository;
 		this.cancellation = cancellation;
 		this.messages = messages;
+		this.plans = plans;
 	}
 
 	@GetMapping("/bookings/{id}/messages")
@@ -90,6 +94,15 @@ class ConsoleController {
 		@AuthenticationPrincipal ConsolePrincipal principal) {
 		return ResponseEntity.ok(repository.summary(principal.providerId()));
 	}
+
+	/** The price list and where this provider sits on it (ADR 0020). */
+	@GetMapping("/plan")
+	ResponseEntity<PlanView> plan(@AuthenticationPrincipal ConsolePrincipal principal) {
+		String current = repository.summary(principal.providerId()).plan();
+		return ResponseEntity.ok(new PlanView(plans.of(current), plans.all()));
+	}
+
+	record PlanView(se.marketplace.pricing.Plans.Plan current, java.util.List<se.marketplace.pricing.Plans.Plan> all) {}
 
 	/**
 	 * Upcoming bookings.

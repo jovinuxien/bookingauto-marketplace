@@ -19,6 +19,7 @@ import se.marketplace.sync.AvailabilityRefreshPort;
 import se.marketplace.sync.CalBookingPort;
 import se.marketplace.pricing.Addon;
 import se.marketplace.pricing.Addons;
+import se.marketplace.pricing.Plans;
 import se.marketplace.pricing.PriceRules;
 import se.marketplace.pricing.Quote;
 import se.marketplace.vehicles.RegistrationNumber;
@@ -61,6 +62,7 @@ public class BookingFunnel {
 	private final PriceRules priceRules;
 	private final Vehicles vehicles;
 	private final Addons addons;
+	private final Plans plans;
 	private final CalBookingPort cal;
 	private final PaymentPort payments;
 	private final AvailabilityRefreshPort availability;
@@ -68,9 +70,6 @@ public class BookingFunnel {
 	private final BookingLinks links;
 
 	/** Basis points. 1500 = 15%. Frozen onto the attempt at stage 5. */
-	@Value("${marketplace.commission-bps:1500}")
-	private int commissionBps;
-
 	@Value("${marketplace.cal.timezone:Europe/Stockholm}")
 	private String timeZone;
 
@@ -84,7 +83,7 @@ public class BookingFunnel {
 	BookingFunnel(BookingRepository repository, CalBookingPort cal,
 		PaymentPort payments, AvailabilityRefreshPort availability, Notifier notifier,
 		BookingLinks links,
-		PriceRules priceRules, Vehicles vehicles, Addons addons) {
+		PriceRules priceRules, Vehicles vehicles, Addons addons, Plans plans) {
 		this.repository = repository;
 		this.cal = cal;
 		this.payments = payments;
@@ -94,6 +93,7 @@ public class BookingFunnel {
 		this.priceRules = priceRules;
 		this.vehicles = vehicles;
 		this.addons = addons;
+		this.plans = plans;
 	}
 
 	/**
@@ -159,7 +159,9 @@ public class BookingFunnel {
 		}
 
 		// Stage 5: freeze the quote. Copied onto the attempt, never re-read.
-		int commission = Math.round(price * commissionBps / 10_000f);
+		// The rate is the provider's plan's (ADR 0020), resolved now and frozen:
+		// a plan change never rewrites a sale in flight.
+		int commission = Math.round(price * plans.of(service.plan()).commissionBps() / 10_000f);
 
 		Attempt attempt = repository.start(new NewAttempt(
 			request.idempotencyKey(),

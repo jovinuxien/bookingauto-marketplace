@@ -37,6 +37,7 @@ class ConsoleRepository {
 		return jdbc.queryForObject("""
 			SELECT p.name,
 			       p.slug,
+			       p.plan,
 			       p.status,
 			       p.onboarding_state,
 			       p.payouts_enabled,
@@ -60,6 +61,7 @@ class ConsoleRepository {
 			(ResultSet rs, int n) -> new Summary(
 				rs.getString("name"),
 				rs.getString("slug"),
+				rs.getString("plan"),
 				rs.getString("status"),
 				rs.getString("onboarding_state"),
 				rs.getBoolean("payouts_enabled"),
@@ -140,6 +142,7 @@ class ConsoleRepository {
 	record Summary(
 		String name,
 		String slug,
+		String plan,
 		String status,
 		String onboardingState,
 		boolean payoutsEnabled,

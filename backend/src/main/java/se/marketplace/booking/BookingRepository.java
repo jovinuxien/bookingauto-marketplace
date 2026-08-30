@@ -488,6 +488,7 @@ class BookingRepository {
 			SELECT s.id, s.provider_id, s.cal_event_type_id, s.price_minor,
 			       s.currency, s.duration_minutes, s.active,
 			       p.status AS provider_status,
+			       p.plan AS provider_plan,
 			       p.stripe_account_id, p.payouts_enabled,
 			       COALESCE(c.asks_vehicle, false) AS asks_vehicle
 			  FROM service s
@@ -505,6 +506,7 @@ class BookingRepository {
 				rs.getInt("duration_minutes"),
 				rs.getBoolean("active"),
 				"active".equals(rs.getString("provider_status")),
+				rs.getString("provider_plan"),
 				rs.getString("stripe_account_id"),
 				rs.getBoolean("payouts_enabled"),
 				rs.getBoolean("asks_vehicle"))).stream().findFirst();
@@ -583,6 +585,8 @@ class BookingRepository {
 		int durationMinutes,
 		boolean active,
 		boolean providerActive,
+		/** The provider's plan (ADR 0020): decides the commission, nothing else. */
+		String plan,
 		String stripeAccountId,
 		boolean payoutsEnabled,
 		/** The category wants a registration number with the booking. */
