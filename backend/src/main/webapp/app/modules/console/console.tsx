@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Pricing from 'app/modules/console/pricing';
+import ConsoleThread from 'app/modules/console/thread';
 
 import { useAppDispatch, useAppSelector } from 'app/config/store';
 import { cancelAsProvider, loadConsole } from 'app/shared/reducers/console.reducer';
@@ -18,6 +19,8 @@ const Console = () => {
     useAppSelector(state => state.console);
   /** The row whose Avboka is awaiting a second click. One at a time. */
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
+  /** The row whose thread is open. One at a time; the table stays a table. */
+  const [threadId, setThreadId] = useState<number | null>(null);
 
   useEffect(() => {
     dispatch(loadConsole());
@@ -79,6 +82,11 @@ const Console = () => {
                     {booking.customerName}
                     <div className="small text-muted">{booking.customerEmail}</div>
                     {booking.addons && <div className="small text-muted">Tillval: {booking.addons}</div>}
+                    <button className="btn btn-link btn-sm p-0 d-block" type="button"
+                      onClick={() => setThreadId(threadId === booking.id ? null : booking.id)}>
+                      {booking.messageCount > 0 ? `Meddelanden (${booking.messageCount})` : 'Skriv till kunden'}
+                    </button>
+                    {threadId === booking.id && <ConsoleThread bookingId={booking.id} customerName={booking.customerName} />}
                     {booking.registrationNumber && (
                       <div className="small">
                         <span className="font-monospace">{booking.registrationNumber}</span>

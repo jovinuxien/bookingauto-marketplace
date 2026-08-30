@@ -5,6 +5,7 @@ import { useAppDispatch, useAppSelector } from 'app/config/store';
 import { cancelBooking, loadBooking, rescheduleBooking, submitReview } from 'app/shared/reducers/my-booking.reducer';
 import axios from 'app/config/axiosinstance';
 import type { DaySlots } from 'app/shared/model/marketplace.model';
+import { MessageThread } from 'app/modules/booking/message-thread';
 import { addDays, todayInZone } from 'app/shared/util/format';
 import { formatDay, formatPrice, formatTime } from 'app/shared/util/format';
 
@@ -170,6 +171,8 @@ const MyBooking = () => {
         )}
 
         {cancelError && <div className="alert alert-warning">{cancelError}</div>}
+
+        <MessageThread token={token} providerName={booking.providerName} />
 
         {/* After the visit. Anchored so the mail can land here. */}
         {booking.reviewable && booking.reviewRating === null && (

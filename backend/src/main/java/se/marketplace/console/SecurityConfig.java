@@ -101,6 +101,8 @@ class SecurityConfig {
 					new AntPathRequestMatcher("/api/bookings/cancel", HttpMethod.POST.name()),
 					new AntPathRequestMatcher("/api/bookings/review", HttpMethod.POST.name()),
 					new AntPathRequestMatcher("/api/bookings/reschedule", HttpMethod.POST.name()),
+					new AntPathRequestMatcher("/api/bookings/messages", HttpMethod.POST.name()),
+					new AntPathRequestMatcher("/api/bookings/messages/list", HttpMethod.POST.name()),
 					new AntPathRequestMatcher("/api/signup/**", HttpMethod.POST.name())))
 
 			.authorizeHttpRequests(it -> it
@@ -166,6 +168,8 @@ class SecurityConfig {
 				.requestMatchers(HttpMethod.POST, "/api/bookings/review").permitAll()
 				// Moving a time: the token in the body is the proof, as for cancel.
 				.requestMatchers(HttpMethod.POST, "/api/bookings/reschedule").permitAll()
+				// The thread: the token in the body is the proof, as everywhere.
+				.requestMatchers(HttpMethod.POST, "/api/bookings/messages", "/api/bookings/messages/list").permitAll()
 				// A provider's reviews, for its page. Nothing in them is not meant to be read.
 				.requestMatchers(HttpMethod.GET, "/api/reviews/*").permitAll()
 

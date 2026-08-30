@@ -25,12 +25,38 @@ class ConsoleController {
 
 	private final ConsoleRepository repository;
 	private final se.marketplace.booking.ProviderCancellation cancellation;
+	private final se.marketplace.booking.BookingMessages messages;
 
 	ConsoleController(ConsoleRepository repository,
-		se.marketplace.booking.ProviderCancellation cancellation) {
+		se.marketplace.booking.ProviderCancellation cancellation,
+		se.marketplace.booking.BookingMessages messages) {
 		this.repository = repository;
 		this.cancellation = cancellation;
+		this.messages = messages;
 	}
+
+	@GetMapping("/bookings/{id}/messages")
+	ResponseEntity<?> messageThread(@AuthenticationPrincipal ConsolePrincipal principal,
+		@org.springframework.web.bind.annotation.PathVariable long id) {
+		return messages.threadFor(principal.providerId(), id)
+			.<ResponseEntity<?>>map(ResponseEntity::ok)
+			.orElseGet(() -> ResponseEntity.notFound().build());
+	}
+
+	@org.springframework.web.bind.annotation.PostMapping("/bookings/{id}/messages")
+	ResponseEntity<?> postMessage(@AuthenticationPrincipal ConsolePrincipal principal,
+		@org.springframework.web.bind.annotation.PathVariable long id,
+		@org.springframework.web.bind.annotation.RequestBody MessageBody body) {
+		return messages.postAsProvider(principal.providerId(), id, body.body())
+			.<ResponseEntity<?>>map(result -> switch (result) {
+				case se.marketplace.booking.BookingMessages.Posted posted -> ResponseEntity.ok(posted.message());
+				case se.marketplace.booking.BookingMessages.Invalid invalid -> ResponseEntity.badRequest().body(invalid.message());
+				default -> ResponseEntity.internalServerError().build();
+			})
+			.orElseGet(() -> ResponseEntity.notFound().build());
+	}
+
+	record MessageBody(String body) {}
 
 	/**
 	 * The salon lets a time go. The refund is unconditional — see

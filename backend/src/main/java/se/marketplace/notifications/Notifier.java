@@ -82,6 +82,12 @@ public interface Notifier {
 	/** The salon's copy of the move — the old work slot is free, the new one is taken. */
 	void providerBookingRescheduled(BookingNotice notice, String providerEmail, java.time.Instant from);
 
+	/** A customer wrote about a booking; the workshop is told, with an excerpt and a console link. */
+	void messageToProvider(BookingNotice notice, String providerEmail, String excerpt);
+
+	/** The workshop answered; the customer is told, with an excerpt and the booking link. */
+	void messageToCustomer(BookingNotice notice, String excerpt);
+
 	/** "Hur var det?" — sent once, a while after the appointment, with the link to rate it. */
 	void reviewRequested(BookingNotice notice);
 

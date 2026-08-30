@@ -324,6 +324,7 @@ db/020                 something extra, chosen at checkout (ADR 0017)
 db/021                 a time can be moved, before the cutoff
 db/022                 the salon can let go too, and the customer is made whole
 db/023                 where a booking came from (ADR 0018)
+db/024                 the thread a booking carries (ADR 0019)
 backend/               Spring Modulith: search, sync, booking, payments,
                        onboarding, console, signup, landing, notifications, geo,
                        ai (whether a model may be called; no agents live there),

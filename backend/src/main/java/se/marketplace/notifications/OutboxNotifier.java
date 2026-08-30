@@ -246,6 +246,40 @@ class OutboxNotifier implements Notifier {
 	}
 
 	@Override
+	public void messageToProvider(BookingNotice notice, String providerEmail, String excerpt) {
+		enqueueTo(providerEmail, notice, "message_to_provider",
+			"Meddelande om " + format(notice),
+			"""
+			Hej,
+
+			%s skriver om sin bokning (%s, %s):
+
+			  "%s"
+
+			Svara i konsolen:
+			%s/konsol
+			""".formatted(notice.customerName(), notice.serviceName(), format(notice),
+				excerpt, publicUrl));
+	}
+
+	@Override
+	public void messageToCustomer(BookingNotice notice, String excerpt) {
+		enqueue(notice, "message_to_customer",
+			"Svar från " + notice.providerName(),
+			"""
+			Hej %s,
+
+			%s har svarat om din bokning:
+
+			  "%s"
+
+			Läs och svara här:
+			%s
+			""".formatted(notice.customerName(), notice.providerName(), excerpt,
+				notice.manageUrl()));
+	}
+
+	@Override
 	public void reviewRequested(BookingNotice notice) {
 		enqueue(notice, "review_requested",
 			"Hur var det hos " + notice.providerName() + "?",

@@ -36,12 +36,35 @@ class ConsumerBookingController {
 
 	private final BookingReviews reviews;
 	private final BookingReschedule reschedule;
+	private final BookingMessages messages;
 
 	ConsumerBookingController(BookingCancellation cancellation, BookingReviews reviews,
-		BookingReschedule reschedule) {
+		BookingReschedule reschedule, BookingMessages messages) {
 		this.cancellation = cancellation;
 		this.reviews = reviews;
 		this.reschedule = reschedule;
+		this.messages = messages;
+	}
+
+	/** POST rather than GET for the same reason lookup is: the token must not land in logs. */
+	@PostMapping("/messages/list")
+	ResponseEntity<?> messageThread(@RequestBody TokenRequest request, HttpServletRequest http) {
+		return messageAnswer(messages.thread(request.token(), clientIp(http)));
+	}
+
+	@PostMapping("/messages")
+	ResponseEntity<?> postMessage(@RequestBody MessageRequest request, HttpServletRequest http) {
+		return messageAnswer(messages.post(request.token(), request.body(), clientIp(http)));
+	}
+
+	private static ResponseEntity<?> messageAnswer(BookingMessages.Result result) {
+		return switch (result) {
+			case BookingMessages.Thread thread -> ResponseEntity.ok(thread);
+			case BookingMessages.Posted posted -> ResponseEntity.ok(posted.message());
+			case BookingMessages.Invalid invalid -> ResponseEntity.badRequest().body(invalid.message());
+			case BookingMessages.Unknown ignored -> ResponseEntity.notFound().build();
+			case BookingMessages.Throttled ignored -> ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
+		};
 	}
 
 	@PostMapping("/reschedule")
@@ -137,5 +160,7 @@ class ConsumerBookingController {
 	record ReviewRequest(String token, int rating, String comment) {}
 
 	record RescheduleRequest(String token, String slotStart) {}
+
+	record MessageRequest(String token, String body) {}
 
 }

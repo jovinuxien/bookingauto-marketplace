@@ -37,6 +37,8 @@ export interface ConsoleBooking {
   vehicle: string | null;
   /** "Spolarvätska, Däckhotell" — what to fetch from the shelf; null for none. */
   addons: string | null;
+  /** How many messages the thread holds. Zero for most bookings, ever. */
+  messageCount: number;
 }
 
 /** One service on the pricing page, with its rules (ADR 0016). */

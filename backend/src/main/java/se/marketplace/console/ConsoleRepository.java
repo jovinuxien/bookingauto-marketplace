@@ -76,7 +76,8 @@ class ConsoleRepository {
 			       b.cal_booking_uid, s.name AS service_name,
 			       b.registration_number, b.vehicle_make, b.vehicle_model, b.vehicle_model_year,
 			       b.vehicle_tyre_front, b.vehicle_tyre_rear,
-			       (SELECT string_agg(x.name, ', ' ORDER BY x.name) FROM booking_addon x WHERE x.booking_id = b.id) AS addons
+			       (SELECT string_agg(x.name, ', ' ORDER BY x.name) FROM booking_addon x WHERE x.booking_id = b.id) AS addons,
+			       (SELECT count(*) FROM booking_message m WHERE m.booking_id = b.id) AS message_count
 			  FROM booking b
 			  JOIN service s ON s.id = b.service_id
 			 WHERE b.provider_id = :id
@@ -99,7 +100,8 @@ class ConsoleRepository {
 				rs.getString("cal_booking_uid"),
 				rs.getString("registration_number"),
 				vehicle(rs),
-				rs.getString("addons")));
+				rs.getString("addons"),
+				rs.getInt("message_count")));
 	}
 
 	/**
@@ -182,7 +184,9 @@ class ConsoleRepository {
 		/** "Volvo V70 (2016)" once the registry has answered; null until then. */
 		String vehicle,
 		/** "Spolarvätska, Däckhotell" — what to fetch from the shelf; null for none. */
-		String addons
+		String addons,
+		/** How many messages the thread holds. Zero for most bookings, ever. */
+		int messageCount
 	) {}
 
 	/** One line or nothing. The columns are filled in together, so make decides. */

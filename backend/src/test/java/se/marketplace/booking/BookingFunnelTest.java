@@ -764,6 +764,16 @@ class BookingFunnelTest {
 		}
 
 		@Override
+		public void messageToProvider(BookingNotice notice, String providerEmail, String excerpt) {
+			// not exercised here
+		}
+
+		@Override
+		public void messageToCustomer(BookingNotice notice, String excerpt) {
+			// not exercised here
+		}
+
+		@Override
 		public void reviewRequested(BookingNotice notice) {
 			// not exercised here
 		}
