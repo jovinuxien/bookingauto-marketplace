@@ -382,6 +382,9 @@ class BookingFunnelTest {
 	void confirmedSaleNotifies() {
 		book();
 		assertThat(notifier.sent).containsExactly("confirmed", "provider-confirmed");
+		// With a link to the booking that was just written -- not "null",
+		// which is what the in-memory attempt would have said.
+		assertThat(notifier.manageUrls.get(0)).contains("/bokning?token=");
 	}
 
 	@Test

@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 import se.marketplace.categories.Categories;
 import se.marketplace.categories.Category;
+import se.marketplace.categories.CategoryPaths;
 
 /**
  * Checks that every category has a page and every page has a category.
@@ -52,7 +53,7 @@ class CategoryRoutes {
 	@EventListener(ApplicationReadyEvent.class)
 	void check() {
 		Set<String> routed = new LinkedHashSet<>(
-			Arrays.asList(LandingController.CATEGORY_PATHS.split("\\|")));
+			Arrays.asList(CategoryPaths.ROUTED.split("\\|")));
 
 		Set<String> known = categories.all().stream()
 			.map(Category::path)
@@ -66,12 +67,12 @@ class CategoryRoutes {
 
 		if (!unreachable.isEmpty()) {
 			log.warn("category has no landing route and cannot be browsed: {} — "
-				+ "add it to LandingController.CATEGORY_PATHS", unreachable);
+				+ "add it to CategoryPaths.ROUTED", unreachable);
 		}
 
 		if (!orphaned.isEmpty()) {
 			log.warn("landing route has no active category and will always 404: {} — "
-				+ "seed it in service_category or remove it from CATEGORY_PATHS", orphaned);
+				+ "seed it in service_category or remove it from CategoryPaths.ROUTED", orphaned);
 		}
 
 		if (unreachable.isEmpty() && orphaned.isEmpty()) {

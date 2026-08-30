@@ -17,6 +17,8 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+
+import se.marketplace.categories.CategoryPaths;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 /**
@@ -83,7 +85,11 @@ class SecurityConfig {
 
 				// --- the crawlable pages ---------------------------------------
 				// Server-rendered, and useless if a crawler is asked to sign in.
-				.requestMatchers("/orter", "/frisor/**", "/massage/**", "/hudvard/**").permitAll()
+				.requestMatchers("/orter").permitAll()
+				// Every routed category page, from the one list the route itself
+				// uses. A copy here answered 401 for the first category added
+				// after it was written, and nothing at boot could tell.
+				.requestMatchers(CategoryPaths.antPatterns()).permitAll()
 				.requestMatchers("/sitemap.xml", "/robots.txt").permitAll()
 
 				// Spring forwards every unhandled status here, so leaving it

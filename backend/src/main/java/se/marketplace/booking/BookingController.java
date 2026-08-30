@@ -29,14 +29,23 @@ class BookingController {
 	}
 
 	@PostMapping
-	ResponseEntity<BookingFunnel.Outcome> book(@RequestBody Request request) {
-		BookingFunnel.Outcome outcome = funnel.book(new BookingFunnel.BookingRequest(
+	ResponseEntity<?> book(@RequestBody Request request) {
+		BookingFunnel.Outcome outcome;
+		try {
+			outcome = funnel.book(new BookingFunnel.BookingRequest(
 			request.idempotencyKey(),
 			request.serviceId(),
 			Instant.parse(request.slotStart()),
 			request.customerName(),
 			request.customerEmail(),
 			request.registrationNumber()));
+		}
+		catch (IllegalArgumentException e) {
+			// The request itself was wrong -- no such service, or a workshop's
+			// service with no registration number -- and nothing was reserved.
+			// 400 with the reason, so the form can say which field.
+			return ResponseEntity.badRequest().body(e.getMessage());
+		}
 
 		HttpStatus status = switch (outcome.state()) {
 			case CONFIRMED -> HttpStatus.CREATED;

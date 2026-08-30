@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 
 import se.marketplace.categories.Categories;
 import se.marketplace.categories.Category;
+import se.marketplace.categories.CategoryPaths;
 
 /**
  * The crawlable entry points.
@@ -31,22 +32,8 @@ import se.marketplace.categories.Category;
 @Controller
 class LandingController {
 
-	/**
-	 * The category paths that have routes, as one compile-time constant.
-	 *
-	 * <p>Used in the mapping below — where it has to be a literal — and checked
-	 * against the table at startup by {@link CategoryRoutes}. The list of
-	 * categories moved into a table (ADR 0013); the list of *URLs* deliberately
-	 * did not, because the alternative is the unbounded {@code /{a}/{b}} the
-	 * comment on the mapping already rejects.
-	 *
-	 * <p>So adding a category stays a two-part deliberate act: a row in a
-	 * migration and a word here. Getting half of it done is now noticed at boot
-	 * rather than by a 404 nobody is watching.
-	 */
-	private static final ZoneId STOCKHOLM = ZoneId.of("Europe/Stockholm");
 
-	static final String CATEGORY_PATHS = "frisor|massage|hudvard|dackbyte|bilservice|bilvard|bilglas|cykelservice";
+	private static final ZoneId STOCKHOLM = ZoneId.of("Europe/Stockholm");
 
 	private final LandingRepository repository;
 	private final ViteManifest manifest;
@@ -89,7 +76,7 @@ class LandingController {
 	// The category is constrained in the pattern itself. An unbounded
 	// /{a}/{b} would sit in front of every other two-segment path in the
 	// application and quietly shadow one the day it is added.
-	@GetMapping("/{category:" + CATEGORY_PATHS + "}/{city}")
+	@GetMapping("/{category:" + CategoryPaths.ROUTED + "}/{city}")
 	String cityCategory(@PathVariable String category, @PathVariable String city, Model model) {
 		// Only known categories are pages. Without this every stray two-segment
 		// path becomes a thin, empty page, and a site full of those ranks worse
@@ -115,7 +102,9 @@ class LandingController {
 		// however it is filed, and the structured data is the part a search
 		// engine believes.
 		model.addAttribute("schemaType", resolved.vehicle() ? "AutoRepair" : "HealthAndBeautyBusiness");
-		String noun = resolved.vehicle() ? "verkstäder" : "salonger";
+		String noun = resolved.vehicle()
+			? (providers.size() == 1 ? "verkstad" : "verkstäder")
+			: (providers.size() == 1 ? "salong" : "salonger");
 		// The calendar, on the one page where it is the reason people came.
 		if ("dack".equals(resolved.slug())) {
 			model.addAttribute("season", TyreSeason.on(LocalDate.now(STOCKHOLM)));

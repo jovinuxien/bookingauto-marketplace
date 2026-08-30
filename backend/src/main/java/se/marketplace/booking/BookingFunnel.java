@@ -261,7 +261,7 @@ public class BookingFunnel {
 		// waiting for Cal's webhook, which is a latency optimisation and not a
 		// guarantee.
 		availability.markStale(attempt.serviceId());
-		confirmedNotices(attempt, reservation.start());
+		confirmedNotices(attempt, reservation.start(), bookingId);
 
 		return new Outcome(attempt.id(), AttemptState.CONFIRMED, reservation.uid(), null);
 	}
@@ -312,7 +312,7 @@ public class BookingFunnel {
 			"booking=" + bookingId, false);
 
 		availability.markStale(attempt.serviceId());
-		confirmedNotices(attempt, attempt.slotStart());
+		confirmedNotices(attempt, attempt.slotStart(), bookingId);
 
 		return new Outcome(attempt.id(), AttemptState.CONFIRMED, attempt.calBookingUid(), null);
 	}
@@ -463,8 +463,11 @@ public class BookingFunnel {
 	 * Both parties to the sale. One notice, two messages: the outbox keys per
 	 * kind, so the provider's copy and the customer's do not collide.
 	 */
-	private void confirmedNotices(Attempt attempt, java.time.Instant startsAt) {
-		Notifier.BookingNotice notice = notice(attempt, "confirmed", startsAt);
+	private void confirmedNotices(Attempt attempt, java.time.Instant startsAt, long bookingId) {
+		// The id just written, not attempt.bookingId(): the in-memory attempt
+		// predates the row and still says null, which reached the customer as
+		// a manage link that read "null". Found by booking a tyre change.
+		Notifier.BookingNotice notice = notice(attempt, "confirmed", startsAt, bookingId);
 		notifier.bookingConfirmed(notice);
 		notifier.providerBookingConfirmed(notice, repository.providerEmail(attempt.providerId()));
 	}
@@ -474,6 +477,11 @@ public class BookingFunnel {
 	 * or a re-run sweeper cannot produce a second email about the same event.
 	 */
 	private Notifier.BookingNotice notice(Attempt attempt, String event, java.time.Instant startsAt) {
+		return notice(attempt, event, startsAt, attempt.bookingId());
+	}
+
+	private Notifier.BookingNotice notice(Attempt attempt, String event, java.time.Instant startsAt,
+		Long bookingId) {
 		return new Notifier.BookingNotice(
 			"attempt:" + attempt.id() + ":" + event,
 			attempt.customerEmail(),
@@ -483,13 +491,13 @@ public class BookingFunnel {
 			startsAt,
 			attempt.priceMinor(),
 			attempt.currency(),
-			attempt.bookingId(),
+			bookingId,
 			attempt.providerId(),
 			// Only once there is a booking. Every other event here is about a
 			// sale that did not complete, and a link to a booking that was never
 			// written is a 404 sent to someone already having a bad time.
-			attempt.bookingId() == null
-				? null : links.urlFor(attempt.bookingId(), attempt.customerEmail()),
+			bookingId == null
+				? null : links.urlFor(bookingId, attempt.customerEmail()),
 			attempt.registrationNumber());
 	}
 
