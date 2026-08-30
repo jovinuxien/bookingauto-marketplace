@@ -71,6 +71,6 @@ Last revised: 2026-08-30 (commit `07a139e`).
 
 ## Not built (so nobody assumes it)
 
-Reviews/ratings · per-vehicle pricing · regnr-first search · add-on services ·
+Reviews/ratings · per-vehicle pricing and regnr-first search (designed, ADR 0016) · add-on services ·
 reschedule · provider-initiated cancellation · workshop widget · messaging ·
 provider subscription tiers · mobile app · consumer accounts (by design, ADR 0014).
