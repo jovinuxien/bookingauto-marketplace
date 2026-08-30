@@ -14,6 +14,8 @@ export interface Registration {
 export interface CategoryChoice {
   slug: string;
   label: string;
+  /** The customer brings a car: the search page asks for the plate first (ADR 0016). */
+  vehicle: boolean;
 }
 
 /** Field name to message, rendered next to the input that caused it. */

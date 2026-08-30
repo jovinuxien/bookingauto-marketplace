@@ -56,7 +56,8 @@ Last revised: 2026-08-30.
 | 4.2 | **Registry lookup after confirmation** (never on the booking path): make, model, year, **tyre dimension front/rear** written onto the booking by a sweep with bounded retries | `BookingVehicles`, db/013, 016 |
 | 4.3 | **Vehicle cache** — a plate is asked of the registry once and remembered (found for a year, unknown for a month); stale rows are served when the registry is down; the sweep and the endpoint both read through it | `Vehicles`, `vehicle` table (db/017, ADR 0016) |
 | 4.4 | **`GET /api/vehicles/{plate}`** — plate in, make/model/year/tyres out; 400 not a plate, 404 unknown, 429 over 30/h per IP, 503 + `Retry-After` when the registry is down with nothing cached | `VehicleController` |
-| 4.5 | **`VehicleRegistryPort`** with two adapters: `DisabledVehicleRegistry` (default) and **`TicVehicleRegistry`** (api.tic.io, key in header, 404 = unknown, everything else = unavailable, foreign plates never sent) | `marketplace.vehicles.registry=none|tic` |
+| 4.5 | **Regnr-first search**: a plate box on `/sok` for vehicle categories (and for any search already carrying a plate), on the provider page for services that ask, and pre-filled at checkout — typed once, carried in the URL (`?regnr=`); every outcome but "not a plate" lets the customer go on | `RegnrBox`, ADR 0016 phase 2 |
+| 4.6 | **`VehicleRegistryPort`** with two adapters: `DisabledVehicleRegistry` (default) and **`TicVehicleRegistry`** (api.tic.io, key in header, 404 = unknown, everything else = unavailable, foreign plates never sent) | `marketplace.vehicles.registry=none|tic` |
 
 ## 5. Platform internals (what keeps the above true)
 
@@ -73,6 +74,6 @@ Last revised: 2026-08-30.
 
 ## Not built (so nobody assumes it)
 
-Reviews/ratings · regnr box on `/sok` and per-vehicle pricing (ADR 0016 phases 2–3; the cache and endpoint exist) · add-on services ·
+Reviews/ratings · per-vehicle pricing (ADR 0016 phase 3; the plate now arrives first) · add-on services ·
 reschedule · provider-initiated cancellation · workshop widget · messaging ·
 provider subscription tiers · mobile app · consumer accounts (by design, ADR 0014).

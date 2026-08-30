@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { RegnrBox } from 'app/modules/vehicles/regnr-box';
 
 import { useAppDispatch, useAppSelector } from 'app/config/store';
 import { loadProvider, loadSlots } from 'app/shared/reducers/provider.reducer';
@@ -23,6 +24,8 @@ const ProviderPage = () => {
     useAppSelector(state => state.provider);
 
   const day = params.get('day') ?? todayInZone();
+  // Carried from the search page, or typed here; carried on to checkout.
+  const regnr = params.get('regnr') ?? undefined;
   const [serviceId, setServiceId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -49,6 +52,14 @@ const ProviderPage = () => {
     const updated = new URLSearchParams(params);
     updated.set('day', next);
     setParams(updated);
+  };
+
+  const setRegnr = (plate: string) => {
+    if (plate !== regnr) {
+      const updated = new URLSearchParams(params);
+      updated.set('regnr', plate);
+      setParams(updated);
+    }
   };
 
   if (loadingProvider) {
@@ -89,6 +100,10 @@ const ProviderPage = () => {
         ))}
       </div>
 
+      {service?.asksVehicle && (
+        <RegnrBox initial={regnr} onPlate={setRegnr} />
+      )}
+
       <div className="d-flex align-items-center gap-2 mb-3">
         <div className="btn-group">
           <button className="btn btn-outline-secondary btn-sm" onClick={() => setDay(addDays(day, -1))}>
@@ -117,7 +132,7 @@ const ProviderPage = () => {
               key={start}
               className="btn btn-outline-primary"
               onClick={() =>
-                navigate(`/boka/${service.id}?start=${encodeURIComponent(start)}&slug=${provider.slug}${service.asksVehicle ? '&fordon=1' : ''}`)
+                navigate(`/boka/${service.id}?start=${encodeURIComponent(start)}&slug=${provider.slug}${service.asksVehicle ? '&fordon=1' : ''}${regnr ? `&regnr=${encodeURIComponent(regnr)}` : ''}`)
               }
             >
               {formatTime(start)}

@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import axios from 'app/config/axiosinstance';
+import type { CategoryChoice } from 'app/shared/model/signup.model';
+import { RegnrBox } from 'app/modules/vehicles/regnr-box';
 
 import { useAppDispatch, useAppSelector } from 'app/config/store';
 import { askSearch, interpretationDropped, runSearch } from 'app/shared/reducers/search.reducer';
@@ -35,6 +38,20 @@ const SearchResults = () => {
   const when = (params.get('when') ?? 'ANY') as SearchCriteriaWhen;
   const radius = Number(params.get('radius') ?? DEFAULT_RADIUS_METRES);
   const category = params.get('category') ?? undefined;
+  const regnr = params.get('regnr') ?? undefined;
+
+  // Which categories mean a car is coming. Fetched, not listed here, for the
+  // reason ADR 0013 gives: the server has the one list. The plate box is
+  // shown for those categories and for any search that already carries a
+  // plate -- a person who typed one has told us what kind of search it is.
+  const [vehicleCategories, setVehicleCategories] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    axios.get<CategoryChoice[]>('/categories').then(
+      response => setVehicleCategories(new Set(response.data.filter(c => c.vehicle).map(c => c.slug))),
+      () => setVehicleCategories(new Set()),
+    );
+  }, []);
+  const asksVehicle = regnr !== undefined || (category !== undefined && vehicleCategories.has(category));
 
   /**
    * The sentence is not in the URL, and that is deliberate.
@@ -118,6 +135,18 @@ const SearchResults = () => {
           setParams(next);
         }} />
 
+      {asksVehicle && (
+        <div className="mb-3">
+          <RegnrBox compact initial={regnr} onPlate={plate => {
+            if (plate !== regnr) {
+              const next = new URLSearchParams(params);
+              next.set('regnr', plate);
+              setParams(next);
+            }
+          }} />
+        </div>
+      )}
+
       <div className="d-flex flex-wrap gap-2 align-items-center mb-4">
         <div className="btn-group">
           <button className="btn btn-outline-secondary btn-sm"
@@ -153,7 +182,7 @@ const SearchResults = () => {
       )}
 
       <div className="row g-3">
-        {hits.map(hit => <ResultCard key={`${hit.providerId}-${hit.serviceName}`} hit={hit} />)}
+        {hits.map(hit => <ResultCard key={`${hit.providerId}-${hit.serviceName}`} hit={hit} regnr={regnr} />)}
       </div>
     </>
   );
@@ -203,13 +232,17 @@ const Understood = ({ interpretation, category, onClearCategory }: {
   );
 };
 
-const ResultCard = ({ hit }: { hit: SearchHit }) => (
+// The plate follows the customer to the salon page, so it is typed once.
+const providerPath = (slug: string, regnr?: string) =>
+  regnr ? `/salong/${slug}?regnr=${encodeURIComponent(regnr)}` : `/salong/${slug}`;
+
+const ResultCard = ({ hit, regnr }: { hit: SearchHit; regnr?: string }) => (
   <div className="col-12">
     <div className="card">
       <div className="card-body d-flex justify-content-between align-items-start flex-wrap gap-3">
         <div>
           <h2 className="h6 mb-1">
-            <Link to={`/salong/${hit.slug}`}>{hit.name}</Link>
+            <Link to={providerPath(hit.slug, regnr)}>{hit.name}</Link>
           </h2>
           <div className="small text-muted">
             {hit.city} · {formatDistance(hit.distanceMetres)}
@@ -225,7 +258,7 @@ const ResultCard = ({ hit }: { hit: SearchHit }) => (
           {hit.firstFreeAt && (
             <div className="fw-semibold">Först {formatTime(hit.firstFreeAt)}</div>
           )}
-          <Link className="btn btn-sm btn-primary mt-2" to={`/salong/${hit.slug}`}>
+          <Link className="btn btn-sm btn-primary mt-2" to={providerPath(hit.slug, regnr)}>
             Visa tider
           </Link>
         </div>

@@ -33,7 +33,9 @@ const Checkout = () => {
   const { outcome, submitting, error } = useAppSelector(state => state.booking);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [plate, setPlate] = useState('');
+  // Pre-filled from the search or the salon page; still editable, because the
+  // car someone looked up is not always the car they are bringing.
+  const [plate, setPlate] = useState(params.get('regnr') ?? '');
 
   // A fresh key per visit, so a customer who comes back to book a different
   // time is not silently replaying the previous attempt.

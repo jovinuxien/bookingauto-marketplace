@@ -28,10 +28,11 @@ class CategoryController {
 	@GetMapping
 	List<Choice> all() {
 		return categories.all().stream()
-			.map(category -> new Choice(category.slug(), category.label()))
+			.map(category -> new Choice(category.slug(), category.label(), category.vehicle()))
 			.toList();
 	}
 
-	record Choice(String slug, String label) {}
+	/** @param vehicle the customer brings a car; the search page asks for the plate first */
+	record Choice(String slug, String label, boolean vehicle) {}
 
 }
