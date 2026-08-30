@@ -157,6 +157,30 @@ class OutboxNotifier implements Notifier {
 	}
 
 	@Override
+	public void providerBookingConfirmed(BookingNotice notice, String providerEmail) {
+		// The plate is the line a workshop reads first, so it is its own line
+		// and absent -- not blank -- when the service never asked for one.
+		String vehicle = notice.registrationNumber() == null
+			? ""
+			: "  Fordon: " + plate(notice.registrationNumber()) + "\n";
+
+		enqueueTo(providerEmail, notice, "provider_booking_confirmed",
+			"Ny bokning: " + format(notice),
+			"""
+			Hej,
+
+			%s har bokat %s.
+
+			  %s
+			  %s
+			%s
+			Kund: %s, %s
+			""".formatted(notice.customerName(), format(notice),
+				notice.serviceName(), price(notice), vehicle,
+				notice.customerName(), notice.customerEmail()));
+	}
+
+	@Override
 	public void bookingNeedsAttention(BookingNotice notice) {
 		// Deliberately no "try again". This state means a compensation itself
 		// failed, so a second attempt could take a second payment.
@@ -196,6 +220,13 @@ class OutboxNotifier implements Notifier {
 
 	private static String format(BookingNotice notice) {
 		return WHEN.format(notice.startsAt().atZone(ZONE));
+	}
+
+	/** ABC123 as ABC 123 -- the way it is on the car. Foreign plates as stored. */
+	private static String plate(String stored) {
+		return stored.matches("[A-Z]{3}[0-9]{2}[0-9A-Z]")
+			? stored.substring(0, 3) + " " + stored.substring(3)
+			: stored;
 	}
 
 	private static String price(BookingNotice notice) {

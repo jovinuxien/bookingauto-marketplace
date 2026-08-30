@@ -261,7 +261,7 @@ public class BookingFunnel {
 		// waiting for Cal's webhook, which is a latency optimisation and not a
 		// guarantee.
 		availability.markStale(attempt.serviceId());
-		notifier.bookingConfirmed(notice(attempt, "confirmed", reservation.start()));
+		confirmedNotices(attempt, reservation.start());
 
 		return new Outcome(attempt.id(), AttemptState.CONFIRMED, reservation.uid(), null);
 	}
@@ -312,7 +312,7 @@ public class BookingFunnel {
 			"booking=" + bookingId, false);
 
 		availability.markStale(attempt.serviceId());
-		notifier.bookingConfirmed(notice(attempt, "confirmed", attempt.slotStart()));
+		confirmedNotices(attempt, attempt.slotStart());
 
 		return new Outcome(attempt.id(), AttemptState.CONFIRMED, attempt.calBookingUid(), null);
 	}
@@ -460,6 +460,16 @@ public class BookingFunnel {
 	}
 
 	/**
+	 * Both parties to the sale. One notice, two messages: the outbox keys per
+	 * kind, so the provider's copy and the customer's do not collide.
+	 */
+	private void confirmedNotices(Attempt attempt, java.time.Instant startsAt) {
+		Notifier.BookingNotice notice = notice(attempt, "confirmed", startsAt);
+		notifier.bookingConfirmed(notice);
+		notifier.providerBookingConfirmed(notice, repository.providerEmail(attempt.providerId()));
+	}
+
+	/**
 	 * The dedupe key is the attempt plus the outcome, so a redelivered webhook
 	 * or a re-run sweeper cannot produce a second email about the same event.
 	 */
@@ -479,7 +489,8 @@ public class BookingFunnel {
 			// sale that did not complete, and a link to a booking that was never
 			// written is a 404 sent to someone already having a bad time.
 			attempt.bookingId() == null
-				? null : links.urlFor(attempt.bookingId(), attempt.customerEmail()));
+				? null : links.urlFor(attempt.bookingId(), attempt.customerEmail()),
+			attempt.registrationNumber());
 	}
 
 	private Outcome outcomeOf(Attempt attempt) {

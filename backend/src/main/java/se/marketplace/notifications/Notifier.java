@@ -55,6 +55,13 @@ public interface Notifier {
 	void providerBookingCancelled(BookingNotice notice, String providerEmail);
 
 	/**
+	 * The provider's copy of a sale: who, what, when — and which car, when the
+	 * service asked for one. A work order rather than a receipt, which is why
+	 * it is its own message and not a second recipient on the customer's.
+	 */
+	void providerBookingConfirmed(BookingNotice notice, String providerEmail);
+
+	/**
 	 * Something is unresolved and a person is looking at it.
 	 *
 	 * <p>Deliberately does not tell the customer to try again — the funnel
@@ -83,7 +90,9 @@ public interface Notifier {
 		String currency,
 		Long bookingId,
 		Long providerId,
-		String manageUrl
+		String manageUrl,
+		/** Normalised plate, or null when the service did not ask for one. */
+		String registrationNumber
 	) {}
 
 }

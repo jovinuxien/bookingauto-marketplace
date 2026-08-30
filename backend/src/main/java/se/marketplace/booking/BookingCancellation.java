@@ -237,7 +237,8 @@ public class BookingCancellation {
 			booking.currency(),
 			booking.id(),
 			booking.providerId(),
-			links.urlFor(booking.id(), booking.customerEmail()));
+			links.urlFor(booking.id(), booking.customerEmail()),
+			booking.registrationNumber());
 
 		notifier.bookingCancelled(notice, refunded, booking.cancellationCutoffHours());
 

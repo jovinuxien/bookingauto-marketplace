@@ -381,7 +381,19 @@ class BookingFunnelTest {
 	@DisplayName("a completed sale tells the customer")
 	void confirmedSaleNotifies() {
 		book();
-		assertThat(notifier.sent).containsExactly("confirmed");
+		assertThat(notifier.sent).containsExactly("confirmed", "provider-confirmed");
+	}
+
+	@Test
+	@DisplayName("the workshop's copy carries the plate")
+	void providerCopyCarriesThePlate() {
+		repository.asksVehicle = true;
+
+		bookWithPlate("abc 123");
+
+		assertThat(notifier.sent).containsExactly("confirmed", "provider-confirmed");
+		assertThat(notifier.providerRecipients).containsExactly("salong@example.se");
+		assertThat(notifier.plates).containsExactly("ABC123", "ABC123");
 	}
 
 	@Test
@@ -417,8 +429,8 @@ class BookingFunnelTest {
 
 		// The dedupe key is enforced in the database, but a caller that sends
 		// twice still costs an insert and a race; the funnel should not try.
-		assertThat(notifier.sent).containsExactly("confirmed");
-		assertThat(notifier.keys).containsExactly("attempt:1:confirmed");
+		assertThat(notifier.sent).containsExactly("confirmed", "provider-confirmed");
+		assertThat(notifier.keys).containsExactly("attempt:1:confirmed", "attempt:1:confirmed");
 	}
 
 	// ----------------------------------------------------------- idempotency --
@@ -565,6 +577,11 @@ class BookingFunnelTest {
 		}
 
 		@Override
+		String providerEmail(long providerId) {
+			return "salong@example.se";
+		}
+
+		@Override
 		String serviceName(long serviceId) {
 			return "Klippning";
 		}
@@ -572,6 +589,9 @@ class BookingFunnelTest {
 
 	/** Records what the customer would be told, and under which key. */
 	private static final class RecordingNotifier implements Notifier {
+
+		final List<String> providerRecipients = new ArrayList<>();
+		final List<String> plates = new ArrayList<>();
 
 		final List<String> sent = new ArrayList<>();
 		final List<String> keys = new ArrayList<>();
@@ -581,6 +601,7 @@ class BookingFunnelTest {
 			sent.add(kind);
 			keys.add(notice.dedupeKey());
 			manageUrls.add(notice.manageUrl());
+			plates.add(notice.registrationNumber());
 		}
 
 		@Override
@@ -606,6 +627,12 @@ class BookingFunnelTest {
 		@Override
 		public void providerBookingCancelled(BookingNotice notice, String providerEmail) {
 			record("provider-cancelled", notice);
+		}
+
+		@Override
+		public void providerBookingConfirmed(BookingNotice notice, String providerEmail) {
+			providerRecipients.add(providerEmail);
+			record("provider-confirmed", notice);
 		}
 
 		@Override

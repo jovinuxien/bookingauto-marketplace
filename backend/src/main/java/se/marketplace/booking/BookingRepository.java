@@ -382,6 +382,13 @@ class BookingRepository {
 			new MapSqlParameterSource("id", providerId), String.class);
 	}
 
+	/** contact_email, not email -- see findBookingForCustomer for why. */
+	String providerEmail(long providerId) {
+		return jdbc.queryForObject(
+			"SELECT COALESCE(contact_email, email) FROM provider WHERE id = :id",
+			new MapSqlParameterSource("id", providerId), String.class);
+	}
+
 	String serviceName(long serviceId) {
 		return jdbc.queryForObject("SELECT name FROM service WHERE id = :id",
 			new MapSqlParameterSource("id", serviceId), String.class);

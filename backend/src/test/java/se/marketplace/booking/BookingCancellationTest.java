@@ -485,6 +485,11 @@ class BookingCancellationTest {
 		}
 
 		@Override
+		public void providerBookingConfirmed(BookingNotice notice, String providerEmail) {
+			sent.add("provider-confirmed");
+		}
+
+		@Override
 		public void providerBookingCancelled(BookingNotice notice, String providerEmail) {
 			sent.add("provider-cancelled");
 			recipients.add(providerEmail);
