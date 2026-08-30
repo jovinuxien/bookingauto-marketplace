@@ -16,6 +16,8 @@ export interface MyBooking {
   /** 'confirmed' | 'cancelled' | 'refunded' */
   status: string;
   customerName: string;
+  /** Null unless the service asked for one. */
+  registrationNumber: string | null;
   /** Still in the future and not already cancelled. */
   cancellable: boolean;
   /** Cancelling right now would return the money. */

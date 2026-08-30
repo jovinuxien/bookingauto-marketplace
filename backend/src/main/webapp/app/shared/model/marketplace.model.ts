@@ -59,6 +59,8 @@ export interface Service {
   durationMinutes: number;
   priceMinor: number;
   currency: string;
+  /** Checkout must ask for a registration number. */
+  asksVehicle: boolean;
 }
 
 export interface ProviderDetail {

@@ -77,11 +77,14 @@ what comes later without renumbering.
 
 ### What is deliberately not in this ADR
 
-- **A vehicle on the booking.** A workshop wants the registration number
-  before the car arrives, and a lookup against it gives make, model and tyre
-  dimension. That is one attribute on the attempt and one lookup, and it is
-  its own decision — this ADR is about whether the categories fit, and they
-  fit without it.
+- **A vehicle on the booking** — deferred here, then done in `db/013`: a
+  category says whether it `asks_vehicle`, checkout asks for the plate when
+  it does, the funnel refuses to sell such a service without one and freezes
+  it onto the attempt and the booking as typed, and a `vehicles` module
+  sweeps confirmed bookings through `VehicleRegistryPort` afterwards to fill
+  in make, model and year. The workshop sees the plate in its console at
+  once and the car once a registry has answered — which, with the disabled
+  adapter, is never, and the booking is no worse for it.
 - **A per-vertical default category** — deferred here, then done first, in
   `db/012`: the signup form asks what the salon sells, the answer becomes
   `provider.default_category_slug`, and the import prefers it over the
@@ -110,15 +113,15 @@ be the exception.
 The vehicle vertical brings in one thing that is genuinely outside: looking a
 registration number up to get make, model and tyre dimension. Transportstyrelsen,
 biluppgifter.se and car.info are all plausible vendors and none of them is a
-decision worth making now. When the vehicle attribute is added (see below), it
-arrives as:
+decision worth making now. The vehicle attribute (`db/013`) arrived as:
 
 - a `vehicles` module with a `VehicleRegistryPort` — `Optional<Vehicle>
   lookup(RegistrationNumber)`, empty when the registry does not know the
-  plate, an `Unavailable` exception when the registry could not be asked,
-  the same two-outcome shape `GeocoderPort` uses and for the same reason;
-- one adapter per vendor, and a `DisabledVehicleRegistry` so that a booking
-  proceeds with the plate a customer typed and nothing looked up;
+  plate, `RegistryUnavailable` when the registry could not be asked, the
+  same two-outcome shape `GeocoderPort` uses and for the same reason;
+- a `DisabledVehicleRegistry` as the default, so that a booking proceeds
+  with the plate a customer typed and nothing looked up; one adapter per
+  vendor when one is chosen, selected by `marketplace.vehicles.registry`;
 - **off the provisioning and booking path.** A workshop can be onboarded and
   a slot can be charged without the registry answering. The lookup enriches
   the attempt, as geocoding enriches a provider — by a sweep or on request,
@@ -143,6 +146,10 @@ hierarchy" — worth watching, not worth solving yet.
 
 ## Watch items
 
+- **No registry answers yet.** `vehicle_make` stays null on every booking
+  until a vendor is chosen and an adapter written. The plate is the useful
+  part and it is there from the first booking; the sweep is the mechanism
+  waiting for something to sweep with.
 - **Synonym collisions across verticals.** `vaxning` is skincare and also
   what a detailer does to paint; it stays with `hud`, and car wax is
   `lackskydd` / `polering`. `service` on its own is claimed by `bilservice`

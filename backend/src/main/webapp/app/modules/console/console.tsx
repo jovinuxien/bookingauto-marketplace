@@ -73,6 +73,12 @@ const Console = () => {
                   <td>
                     {booking.customerName}
                     <div className="small text-muted">{booking.customerEmail}</div>
+                    {booking.registrationNumber && (
+                      <div className="small">
+                        <span className="font-monospace">{booking.registrationNumber}</span>
+                        {booking.vehicle && <span className="text-muted"> · {booking.vehicle}</span>}
+                      </div>
+                    )}
                   </td>
                   <td className="text-end">{formatPrice(booking.priceMinor, booking.currency)}</td>
                   <td className="text-end text-muted">

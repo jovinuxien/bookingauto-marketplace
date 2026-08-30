@@ -1,6 +1,7 @@
 package se.marketplace.booking;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -64,7 +65,12 @@ class BookingFunnelTest {
 
 	private BookingFunnel.Outcome book() {
 		return funnel.book(new BookingFunnel.BookingRequest(
-			"key-1", 1L, SLOT, "Testkund", "test@example.se"));
+			"key-1", 1L, SLOT, "Testkund", "test@example.se", null));
+	}
+
+	private BookingFunnel.Outcome bookWithPlate(String plate) {
+		return funnel.book(new BookingFunnel.BookingRequest(
+			"key-1", 1L, SLOT, "Testkund", "test@example.se", plate));
 	}
 
 	// ------------------------------------------------------------ happy path --
@@ -82,6 +88,40 @@ class BookingFunnelTest {
 		assertThat(cal.cancelled).isEmpty();
 		assertThat(payments.charged).isEqualTo(1);
 		assertThat(payments.refunded).isEmpty();
+	}
+
+	// ---------------------------------------------------------- the vehicle --
+
+	@Test
+	@DisplayName("a workshop's service will not sell without a registration number")
+	void plateRequiredWhenTheCategoryAsks() {
+		repository.asksVehicle = true;
+
+		assertThatThrownBy(() -> bookWithPlate(" "))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("registration number");
+		// Refused before anything was frozen or reserved.
+		assertThat(repository.started).isNull();
+		assertThat(cal.reserved).isZero();
+	}
+
+	@Test
+	@DisplayName("the plate is normalised onto the attempt, and nothing is looked up")
+	void plateIsFrozenAsTyped() {
+		repository.asksVehicle = true;
+
+		BookingFunnel.Outcome outcome = bookWithPlate("abc 123");
+
+		assertThat(outcome.sold()).isTrue();
+		assertThat(repository.started.registrationNumber()).isEqualTo("ABC123");
+	}
+
+	@Test
+	@DisplayName("a salon's service ignores a plate rather than storing one")
+	void plateIgnoredWhenTheCategoryDoesNotAsk() {
+		bookWithPlate("ABC123");
+
+		assertThat(repository.started.registrationNumber()).isNull();
 	}
 
 	@Test
@@ -410,6 +450,7 @@ class BookingFunnelTest {
 
 		private final List<AttemptState> transitions = new ArrayList<>();
 		private Attempt started;
+		private boolean asksVehicle;
 		Attempt current;
 		private int misses;
 		private boolean sealed;
@@ -425,7 +466,7 @@ class BookingFunnelTest {
 		@Override
 		Optional<ServiceForSale> findServiceForSale(long serviceId) {
 			return Optional.of(new ServiceForSale(
-				1L, 1L, 1L, 60000, "SEK", 45, true, true, "acct_test", true));
+				1L, 1L, 1L, 60000, "SEK", 45, true, true, "acct_test", true, asksVehicle));
 		}
 
 		@Override
@@ -438,7 +479,8 @@ class BookingFunnelTest {
 			started = new Attempt(1L, request.idempotencyKey(), request.providerId(),
 				request.serviceId(), request.slotStart(), request.priceMinor(),
 				request.commissionMinor(), request.currency(), request.customerEmail(),
-				request.customerName(), AttemptState.STARTED, null, null, null, null, null, null);
+				request.customerName(), AttemptState.STARTED, null, null, null, null, null, null,
+				request.registrationNumber());
 			current = started;
 			return started;
 		}
@@ -473,7 +515,7 @@ class BookingFunnelTest {
 				current.serviceId(), current.slotStart(), current.priceMinor(),
 				current.commissionMinor(), current.currency(), current.customerEmail(),
 				current.customerName(), current.state(), uid, current.paymentRef(), null, null,
-				end, status);
+				end, status, current.registrationNumber());
 		}
 
 		@Override

@@ -84,7 +84,7 @@ class BookingCancellationTest {
 			60000, "SEK", "confirmed",
 			24, null, false,
 			"Salong Södermalm", "salong@example.se", "Stockholm",
-			"Klippning", "ch_1");
+			"Klippning", "ch_1", null);
 	}
 
 	private void given(BookingRepository.ConsumerBooking booking) {
@@ -254,7 +254,7 @@ class BookingCancellationTest {
 			unpaid.priceMinor(), unpaid.currency(), unpaid.status(),
 			unpaid.cancellationCutoffHours(), null, false,
 			unpaid.providerName(), unpaid.providerEmail(), unpaid.city(),
-			unpaid.serviceName(), null));
+			unpaid.serviceName(), null, null));
 
 		var result = cancel();
 
@@ -290,7 +290,7 @@ class BookingCancellationTest {
 			neighbour.startsAt(), neighbour.endsAt(), "someone.else@example.se", "Berit",
 			neighbour.priceMinor(), neighbour.currency(), "confirmed",
 			24, null, false, neighbour.providerName(), neighbour.providerEmail(),
-			neighbour.city(), neighbour.serviceName(), "ch_2"));
+			neighbour.city(), neighbour.serviceName(), "ch_2", null));
 
 		// The id is what the caller controls; the signature is what they cannot
 		// produce for it.
@@ -346,7 +346,7 @@ class BookingCancellationTest {
 			b.id(), b.providerId(), b.serviceId(), b.calBookingUid(), b.startsAt(), b.endsAt(),
 			b.customerEmail(), b.customerName(), b.priceMinor(), b.currency(), b.status(),
 			b.cancellationCutoffHours(), null, false, b.providerName(), null, b.city(),
-			b.serviceName(), b.paymentRef()));
+			b.serviceName(), b.paymentRef(), null));
 
 		assertThat(cancel()).isInstanceOf(BookingCancellation.Cancelled.class);
 		assertThat(notifier.sent).containsExactly("cancelled-refunded");
@@ -406,7 +406,8 @@ class BookingCancellationTest {
 			return new ConsumerBooking(b.id(), b.providerId(), b.serviceId(), b.calBookingUid(),
 				b.startsAt(), b.endsAt(), b.customerEmail(), b.customerName(), b.priceMinor(),
 				b.currency(), status, b.cancellationCutoffHours(), Instant.now(), needsAttention,
-				b.providerName(), b.providerEmail(), b.city(), b.serviceName(), b.paymentRef());
+				b.providerName(), b.providerEmail(), b.city(), b.serviceName(), b.paymentRef(),
+				b.registrationNumber());
 		}
 	}
 

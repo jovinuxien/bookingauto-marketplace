@@ -30,6 +30,10 @@ export interface ConsoleBooking {
   status: string;
   serviceName: string;
   calBookingUid: string;
+  /** Null for a salon's booking. */
+  registrationNumber: string | null;
+  /** "Volvo V70 (2016)" once looked up; null until then, or forever if no registry. */
+  vehicle: string | null;
 }
 
 /** An attempt no machine could finish. */

@@ -16,6 +16,7 @@ import se.marketplace.notifications.Notifier;
 import se.marketplace.payments.PaymentPort;
 import se.marketplace.sync.AvailabilityRefreshPort;
 import se.marketplace.sync.CalBookingPort;
+import se.marketplace.vehicles.RegistrationNumber;
 
 /**
  * The funnel.
@@ -109,6 +110,18 @@ public class BookingFunnel {
 			throw new IllegalStateException("service " + service.serviceId() + " is not on sale");
 		}
 
+		// The plate, if the category asks for one. Normalised here so what is
+		// stored is what a registry can be asked for; required here so a
+		// workshop is never sent a booking with no car on it. Nothing is looked
+		// up -- that happens after confirmation, off this path (ADR 0015).
+		String plate = null;
+		if (service.asksVehicle()) {
+			plate = RegistrationNumber.parse(request.registrationNumber())
+				.map(RegistrationNumber::value)
+				.orElseThrow(() -> new IllegalArgumentException(
+					"service " + service.serviceId() + " needs a registration number"));
+		}
+
 		// Stage 5: freeze the quote. Copied onto the attempt, never re-read.
 		int commission = Math.round(service.priceMinor() * commissionBps / 10_000f);
 
@@ -121,7 +134,8 @@ public class BookingFunnel {
 			commission,
 			service.currency(),
 			request.customerEmail(),
-			request.customerName()));
+			request.customerName(),
+			plate));
 
 		return runSaga(attempt, service, request);
 	}
@@ -477,7 +491,9 @@ public class BookingFunnel {
 		long serviceId,
 		Instant slotStart,
 		String customerName,
-		String customerEmail
+		String customerEmail,
+		/** As typed. Null or blank unless the service's category asks. */
+		String registrationNumber
 	) {}
 
 	/**

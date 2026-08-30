@@ -49,11 +49,11 @@ class BookingRepository {
 			INSERT INTO booking_attempt
 			  (idempotency_key, provider_id, service_id, slot_start,
 			   price_minor, commission_minor, currency,
-			   customer_email, customer_name, state)
+			   customer_email, customer_name, registration_number, state)
 			VALUES
 			  (:key, :providerId, :serviceId, :slotStart,
 			   :priceMinor, :commissionMinor, :currency,
-			   :email, :name, 'STARTED')
+			   :email, :name, :plate, 'STARTED')
 			""",
 			new MapSqlParameterSource()
 				.addValue("key", request.idempotencyKey())
@@ -64,7 +64,8 @@ class BookingRepository {
 				.addValue("commissionMinor", request.commissionMinor())
 				.addValue("currency", request.currency())
 				.addValue("email", request.customerEmail())
-				.addValue("name", request.customerName()),
+				.addValue("name", request.customerName())
+				.addValue("plate", request.registrationNumber()),
 			keys, new String[] { "id" });
 
 		long id = keys.getKey().longValue();
@@ -207,11 +208,11 @@ class BookingRepository {
 			INSERT INTO booking
 			  (provider_id, service_id, cal_booking_uid, starts_at, ends_at,
 			   customer_email, customer_name, price_minor, commission_minor, currency,
-			   cancellation_cutoff_hours)
+			   cancellation_cutoff_hours, registration_number)
 			VALUES
 			  (:providerId, :serviceId, :uid, :startsAt, :endsAt,
 			   :email, :name, :priceMinor, :commissionMinor, :currency,
-			   :cutoffHours)
+			   :cutoffHours, :plate)
 			""",
 			new MapSqlParameterSource()
 				.addValue("providerId", attempt.providerId())
@@ -224,7 +225,8 @@ class BookingRepository {
 				.addValue("priceMinor", attempt.priceMinor())
 				.addValue("commissionMinor", attempt.commissionMinor())
 				.addValue("currency", attempt.currency())
-				.addValue("cutoffHours", cancellationCutoffHours),
+				.addValue("cutoffHours", cancellationCutoffHours)
+				.addValue("plate", attempt.registrationNumber()),
 			keys, new String[] { "id" });
 
 		long bookingId = keys.getKey().longValue();
@@ -253,6 +255,7 @@ class BookingRepository {
 			       b.starts_at, b.ends_at, b.customer_email, b.customer_name,
 			       b.price_minor, b.currency, b.status,
 			       b.cancellation_cutoff_hours, b.cancelled_at, b.needs_attention,
+			       b.registration_number,
 			       -- contact_email, not email. db/001's provider.email is a
 			       -- marketing field and is null on every row in this database;
 			       -- what onboarding and signup actually write is contact_email,
@@ -290,7 +293,8 @@ class BookingRepository {
 				rs.getString("provider_email"),
 				rs.getString("city"),
 				rs.getString("service_name"),
-				rs.getString("payment_ref"))).stream().findFirst();
+				rs.getString("payment_ref"),
+				rs.getString("registration_number"))).stream().findFirst();
 	}
 
 	/**
@@ -389,8 +393,11 @@ class BookingRepository {
 			SELECT s.id, s.provider_id, s.cal_event_type_id, s.price_minor,
 			       s.currency, s.duration_minutes, s.active,
 			       p.status AS provider_status,
-			       p.stripe_account_id, p.payouts_enabled
-			  FROM service s JOIN provider p ON p.id = s.provider_id
+			       p.stripe_account_id, p.payouts_enabled,
+			       COALESCE(c.asks_vehicle, false) AS asks_vehicle
+			  FROM service s
+			  JOIN provider p ON p.id = s.provider_id
+			  LEFT JOIN service_category c ON c.slug = s.category_slug
 			 WHERE s.id = :id
 			""",
 			new MapSqlParameterSource("id", serviceId),
@@ -404,7 +411,8 @@ class BookingRepository {
 				rs.getBoolean("active"),
 				"active".equals(rs.getString("provider_status")),
 				rs.getString("stripe_account_id"),
-				rs.getBoolean("payouts_enabled"))).stream().findFirst();
+				rs.getBoolean("payouts_enabled"),
+				rs.getBoolean("asks_vehicle"))).stream().findFirst();
 	}
 
 	/**
@@ -462,7 +470,8 @@ class BookingRepository {
 		String providerEmail,
 		String city,
 		String serviceName,
-		String paymentRef
+		String paymentRef,
+		String registrationNumber
 	) {
 
 		boolean confirmed() {
@@ -480,7 +489,9 @@ class BookingRepository {
 		boolean active,
 		boolean providerActive,
 		String stripeAccountId,
-		boolean payoutsEnabled
+		boolean payoutsEnabled,
+		/** The category wants a registration number with the booking. */
+		boolean asksVehicle
 	) {}
 
 	private static String truncate(String s) {
@@ -504,7 +515,8 @@ class BookingRepository {
 		(Long) rs.getObject("booking_id"),
 		rs.getString("failure"),
 		rs.getTimestamp("reserved_end") == null ? null : rs.getTimestamp("reserved_end").toInstant(),
-		rs.getString("reserved_status"));
+		rs.getString("reserved_status"),
+		rs.getString("registration_number"));
 
 	record Attempt(
 		long id,
@@ -523,13 +535,14 @@ class BookingRepository {
 		Long bookingId,
 		String failure,
 		Instant reservedEnd,
-		String reservedStatus
+		String reservedStatus,
+		String registrationNumber
 	) {
 		Attempt withState(AttemptState next) {
 			return new Attempt(id, idempotencyKey, providerId, serviceId, slotStart,
 				priceMinor, commissionMinor, currency, customerEmail, customerName,
 				next, calBookingUid, paymentRef, bookingId, failure,
-				reservedEnd, reservedStatus);
+				reservedEnd, reservedStatus, registrationNumber);
 		}
 
 		/** Mirrors {@code CalBookingPort.Reservation.awaitingConfirmation()}. */
@@ -547,7 +560,9 @@ class BookingRepository {
 		int commissionMinor,
 		String currency,
 		String customerEmail,
-		String customerName
+		String customerName,
+		/** Normalised, or null when the category did not ask. */
+		String registrationNumber
 	) {}
 
 }

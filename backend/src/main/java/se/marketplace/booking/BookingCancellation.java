@@ -267,7 +267,8 @@ public class BookingCancellation {
 			confirmed && refundDue(booking, now),
 			freeUntil(booking),
 			booking.cancellationCutoffHours(),
-			booking.needsAttention());
+			booking.needsAttention(),
+			booking.registrationNumber());
 	}
 
 	/** The row as it now reads, without going back to the database to find out. */
@@ -280,7 +281,7 @@ public class BookingCancellation {
 			booking.priceMinor(), booking.currency(), status,
 			booking.cancellationCutoffHours(), Instant.now(), needsAttention,
 			booking.providerName(), booking.providerEmail(), booking.city(),
-			booking.serviceName(), booking.paymentRef());
+			booking.serviceName(), booking.paymentRef(), booking.registrationNumber());
 	}
 
 	// ------------------------------------------------------------ outcomes --
@@ -306,7 +307,9 @@ public class BookingCancellation {
 		boolean refundable,
 		Instant freeUntil,
 		int cutoffHours,
-		boolean needsAttention
+		boolean needsAttention,
+		/** Null unless the service asked for one. */
+		String registrationNumber
 	) {}
 
 	public sealed interface Result {}

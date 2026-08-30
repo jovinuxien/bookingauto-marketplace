@@ -50,15 +50,18 @@ class CatalogueController {
 		ProviderDetail provider = found.get(0);
 
 		List<ProviderDetail.Service> services = jdbc.query("""
-			SELECT id, name, category_slug, duration_minutes, price_minor, currency
-			  FROM service
-			 WHERE provider_id = :id AND active
-			 ORDER BY name
+			SELECT s.id, s.name, s.category_slug, s.duration_minutes, s.price_minor, s.currency,
+			       COALESCE(c.asks_vehicle, false) AS asks_vehicle
+			  FROM service s
+			  LEFT JOIN service_category c ON c.slug = s.category_slug
+			 WHERE s.provider_id = :id AND s.active
+			 ORDER BY s.name
 			""",
 			new MapSqlParameterSource("id", provider.id()),
 			(ResultSet rs, int n) -> new ProviderDetail.Service(
 				rs.getLong("id"), rs.getString("name"), rs.getString("category_slug"),
-				rs.getInt("duration_minutes"), rs.getInt("price_minor"), rs.getString("currency")));
+				rs.getInt("duration_minutes"), rs.getInt("price_minor"), rs.getString("currency"),
+				rs.getBoolean("asks_vehicle")));
 
 		return ResponseEntity.ok(new ProviderDetail(
 			provider.id(), provider.slug(), provider.name(), provider.city(),

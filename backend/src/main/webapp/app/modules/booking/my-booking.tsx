@@ -103,6 +103,7 @@ const MyBooking = () => {
           />
           <Row label="Pris" value={formatPrice(booking.priceMinor, booking.currency)} />
           <Row label="Bokad av" value={booking.customerName} />
+          {booking.registrationNumber && <Row label="Fordon" value={booking.registrationNumber} />}
           <Row label="Status" value={<Status status={booking.status} />} />
         </dl>
 

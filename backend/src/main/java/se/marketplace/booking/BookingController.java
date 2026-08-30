@@ -35,7 +35,8 @@ class BookingController {
 			request.serviceId(),
 			Instant.parse(request.slotStart()),
 			request.customerName(),
-			request.customerEmail()));
+			request.customerEmail(),
+			request.registrationNumber()));
 
 		HttpStatus status = switch (outcome.state()) {
 			case CONFIRMED -> HttpStatus.CREATED;
@@ -58,7 +59,9 @@ class BookingController {
 		long serviceId,
 		String slotStart,
 		String customerName,
-		String customerEmail
+		String customerEmail,
+		/** Only for services whose category asks; ignored otherwise. */
+		String registrationNumber
 	) {}
 
 }

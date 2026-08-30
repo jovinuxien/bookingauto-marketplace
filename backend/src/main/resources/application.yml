@@ -184,6 +184,20 @@ marketplace:
   ratelimit:
     sweep-ms: ${MARKETPLACE_RATELIMIT_SWEEP_MS:3600000}
 
+  vehicles:
+    # Which registry answers "what car is ABC 123". 'none' by default: every
+    # candidate is a contract and an API key, and the bil & däck vertical
+    # (ADR 0015) works without one -- bookings carry the plate the customer
+    # typed and the workshop reads it. When a vendor is chosen it is one
+    # adapter behind VehicleRegistryPort and one value here.
+    registry: ${MARKETPLACE_VEHICLES_REGISTRY:none}
+
+    # Bounded retry, as for geocoding: a plate the registry does not know is
+    # almost always a typo, and a typo is not fixed by asking a fourth time.
+    max-attempts: ${MARKETPLACE_VEHICLES_MAX_ATTEMPTS:3}
+    batch-size: ${MARKETPLACE_VEHICLES_BATCH_SIZE:20}
+    interval-ms: ${MARKETPLACE_VEHICLES_INTERVAL_MS:300000}
+
   geocoding:
     # 'none' by default, and that is not laziness. Enabling a geocoder by
     # default would point every developer machine and every CI run at a public

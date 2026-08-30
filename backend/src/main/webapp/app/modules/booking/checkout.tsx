@@ -25,10 +25,15 @@ const Checkout = () => {
 
   const start = params.get('start') ?? '';
   const slug = params.get('slug') ?? '';
+  // Told by the link rather than fetched: the provider page already knew,
+  // and the server checks again regardless -- a workshop is never sent a
+  // booking with no car on it whatever the URL said.
+  const asksVehicle = params.get('fordon') === '1';
 
   const { outcome, submitting, error } = useAppSelector(state => state.booking);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [plate, setPlate] = useState('');
 
   // A fresh key per visit, so a customer who comes back to book a different
   // time is not silently replaying the previous attempt.
@@ -43,6 +48,7 @@ const Checkout = () => {
       slotStart: start,
       customerName: name,
       customerEmail: email,
+      ...(asksVehicle ? { registrationNumber: plate } : {}),
     }));
   };
 
@@ -128,6 +134,15 @@ const Checkout = () => {
               onChange={event => setEmail(event.target.value)} />
             <div className="form-text">Hit skickas bekräftelsen.</div>
           </div>
+          {asksVehicle && (
+            <div className="mb-3">
+              <label className="form-label" htmlFor="plate">Registreringsnummer</label>
+              <input id="plate" className="form-control" required value={plate}
+                autoComplete="off" placeholder="ABC 123"
+                onChange={event => setPlate(event.target.value)} />
+              <div className="form-text">Så att verkstaden vet vilken bil som kommer.</div>
+            </div>
+          )}
 
           <button className="btn btn-primary" type="submit" disabled={submitting}>
             {submitting ? 'Bokar…' : 'Boka och betala'}

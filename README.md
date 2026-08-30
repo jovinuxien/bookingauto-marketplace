@@ -312,11 +312,13 @@ docs/design/           booking-funnel.md — the saga, stage by stage
 db/010                 consumer cancellation -- the terms, and what happened
 db/011                 bil & däck -- four categories, ADR 0015
 db/012                 the salon says what it sells; the import believes it
+db/013                 which car is coming -- the plate, and a port for the rest
 backend/               Spring Modulith: search, sync, booking, payments,
                        onboarding, console, signup, landing, notifications, geo,
                        ai (whether a model may be called; no agents live there),
                        ratelimit (a bucket, a window and a count),
-                       categories (what a salon sells, and its URL)
+                       categories (what a salon sells, and its URL),
+                       vehicles (which car is coming; a port with no vendor yet)
   src/main/webapp/app/ React SPA — config/, shared/, modules/; built into the jar
 ```
 

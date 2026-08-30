@@ -25,7 +25,9 @@ public record ProviderDetail(
 		String categorySlug,
 		int durationMinutes,
 		int priceMinor,
-		String currency
+		String currency,
+		/** Checkout asks for a registration number. */
+		boolean asksVehicle
 	) {}
 
 }

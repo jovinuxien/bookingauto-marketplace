@@ -117,7 +117,7 @@ const ProviderPage = () => {
               key={start}
               className="btn btn-outline-primary"
               onClick={() =>
-                navigate(`/boka/${service.id}?start=${encodeURIComponent(start)}&slug=${provider.slug}`)
+                navigate(`/boka/${service.id}?start=${encodeURIComponent(start)}&slug=${provider.slug}${service.asksVehicle ? '&fordon=1' : ''}`)
               }
             >
               {formatTime(start)}

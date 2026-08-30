@@ -71,7 +71,8 @@ class ConsoleRepository {
 		return jdbc.query("""
 			SELECT b.id, b.starts_at, b.ends_at, b.customer_name, b.customer_email,
 			       b.price_minor, b.commission_minor, b.currency, b.status,
-			       b.cal_booking_uid, s.name AS service_name
+			       b.cal_booking_uid, s.name AS service_name,
+			       b.registration_number, b.vehicle_make, b.vehicle_model, b.vehicle_model_year
 			  FROM booking b
 			  JOIN service s ON s.id = b.service_id
 			 WHERE b.provider_id = :id
@@ -91,7 +92,9 @@ class ConsoleRepository {
 				rs.getString("currency"),
 				rs.getString("status"),
 				rs.getString("service_name"),
-				rs.getString("cal_booking_uid")));
+				rs.getString("cal_booking_uid"),
+				rs.getString("registration_number"),
+				vehicle(rs)));
 	}
 
 	/**
@@ -149,8 +152,24 @@ class ConsoleRepository {
 		String currency,
 		String status,
 		String serviceName,
-		String calBookingUid
+		String calBookingUid,
+		/** As the customer typed it, normalised. Null for a salon's booking. */
+		String registrationNumber,
+		/** "Volvo V70 (2016)" once the registry has answered; null until then. */
+		String vehicle
 	) {}
+
+	/** One line or nothing. The columns are filled in together, so make decides. */
+	private static String vehicle(ResultSet rs) throws java.sql.SQLException {
+		String make = rs.getString("vehicle_make");
+		if (make == null) {
+			return null;
+		}
+		String model = rs.getString("vehicle_model");
+		int year = rs.getInt("vehicle_model_year");
+		String name = model == null ? make : make + " " + model;
+		return rs.wasNull() ? name : name + " (" + year + ")";
+	}
 
 	record AttentionRow(
 		long id,

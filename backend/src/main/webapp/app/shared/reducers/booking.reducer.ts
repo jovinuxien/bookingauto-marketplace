@@ -9,6 +9,8 @@ export interface CheckoutRequest {
   slotStart: string;
   customerName: string;
   customerEmail: string;
+  /** Sent only when the service asks; the server ignores it otherwise. */
+  registrationNumber?: string;
 }
 
 interface BookingState {
