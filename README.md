@@ -308,6 +308,7 @@ db/                    marketplace schema; 002 onwards are applied by hand
 docker/                build-api-v2.sh — no published image exists
 seed/                  dev fixtures — cal-dev.sh seeds both sides
 docs/decisions/        ADRs — why, not what
+docs/FEATURES.md       what -- every feature that exists, numbered, kept current
 docs/design/           booking-funnel.md — the saga, stage by stage
 db/010                 consumer cancellation -- the terms, and what happened
 db/011                 bil & däck -- four categories, ADR 0015
